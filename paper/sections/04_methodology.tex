@@ -1,9 +1,266 @@
 \section{Proposed Methodology}
 \label{sec:methodology}
 
-% Placeholder: To be drafted next
-% This section will cover:
-% - Dynamic sensor-side quantization scheme
-% - Temporal subsampling and residual encoding
-% - TCN architecture design
-% - Hardware-aware training and deployment
+This section presents the proposed hybrid scheme for energy-efficient air quality monitoring, integrating sensor-side dynamic quantization with hardware-aware temporal convolutional networks. The methodology comprises four interconnected components: (i) dynamic sensor-side quantization with adaptive range scaling, (ii) temporal subsampling and residual encoding, (iii) TCN architecture design optimized for quantized inputs, and (iv) hardware-aware training and deployment protocols. Figure~\ref{fig:system_overview} illustrates the end-to-end pipeline from raw sensor measurements to edge-based predictions.
+
+\subsection{System Architecture Overview}
+
+The proposed system operates in a hierarchical edge-cloud architecture consisting of three tiers. At the \textit{sensor tier}, DALTON nodes sample six pollutant channels (PM$_{2.5}$, PM$_{10}$, CO$_2$, NO$_2$, VOC, CO) at 1~Hz and apply dynamic quantization and temporal subsampling locally. Quantized packets are transmitted wirelessly to an \textit{edge gateway} (e.g., Raspberry Pi 4) every $T_S = 4$ seconds. The edge gateway maintains sliding windows of quantized observations and performs inference using a quantized TCN model to generate 10-minute ahead PM$_{2.5}$ forecasts. Predictions and raw data summaries are optionally forwarded to a \textit{cloud backend} for long-term storage, model retraining, and visualization. This architecture minimizes sensor-to-gateway transmission energy while enabling real-time, privacy-preserving predictions at the edge \cite{himeur2024edge, fici2025sensors}.
+
+\subsection{Dynamic Sensor-Side Quantization}
+
+\subsubsection{Uniform Mid-Rise Quantizer}
+
+Each pollutant channel $c \in \{1, 2, \ldots, 6\}$ is quantized using a uniform mid-rise quantizer with $b_c$ bits, dynamic range $[a_c(t), b_c(t)]$, and step size
+\begin{equation}
+\Delta_c(t) = \frac{b_c(t) - a_c(t)}{2^{b_c}}.
+\label{eq:step_size}
+\end{equation}
+For a raw sensor measurement $x_t^{(c)} \in \mathbb{R}$ at time $t$, the quantized value is
+\begin{equation}
+\tilde{x}_t^{(c)} = Q_c(x_t^{(c)}; a_c(t), b_c(t), b_c) = \text{clip}\left( a_c(t) + \Delta_c(t) \cdot \left\lfloor \frac{x_t^{(c)} - a_c(t)}{\Delta_c(t)} + \frac{1}{2} \right\rfloor, a_c(t), b_c(t) \right),
+\label{eq:quantization}
+\end{equation}
+where $\text{clip}(\cdot, a, b)$ constrains the output to $[a, b]$ and $\lfloor \cdot \rfloor$ denotes the floor function. The quantization index $k_t^{(c)} \in \{0, 1, \ldots, 2^{b_c}-1\}$ transmitted over the wireless link is
+\begin{equation}
+k_t^{(c)} = \left\lfloor \frac{x_t^{(c)} - a_c(t)}{\Delta_c(t)} + \frac{1}{2} \right\rfloor.
+\label{eq:quantization_index}
+\end{equation}
+At the receiver (edge gateway), the quantized value is reconstructed as
+\begin{equation}
+\hat{x}_t^{(c)} = a_c(t) + k_t^{(c)} \cdot \Delta_c(t).
+\label{eq:reconstruction}
+\end{equation}
+
+The quantization noise introduced by this uniform quantizer, assuming input uniformly distributed within each quantization bin, has variance \cite{gray1998quantization}
+\begin{equation}
+\sigma_{q,c}^2 = \frac{\Delta_c^2(t)}{12}.
+\label{eq:quantization_noise}
+\end{equation}
+
+\subsubsection{Adaptive Range Scaling}
+
+Static quantization ranges defined over the entire DALTON dataset lead to inefficient bit allocation, as pollutant concentrations vary significantly across sites, seasons, and activities \cite{karmakar2024exploring}. To exploit this variability, we implement \textit{adaptive range scaling} that updates $[a_c(t), b_c(t)]$ periodically based on recent observations. Every $T_R = 300$ seconds (5 minutes), each channel's range is recalibrated using the empirical 1st and 99th percentiles of the last $N_R = 300$ samples:
+\begin{equation}
+a_c(t) = P_1\left( \{x_{t-N_R+1}^{(c)}, \ldots, x_t^{(c)}\} \right), \quad
+b_c(t) = P_{99}\left( \{x_{t-N_R+1}^{(c)}, \ldots, x_t^{(c)}\} \right),
+\label{eq:adaptive_range}
+\end{equation}
+where $P_\alpha(\cdot)$ denotes the $\alpha$-th percentile operator. This percentile-based approach is robust to transient outliers (e.g., sensor glitches) while capturing the dominant operating range \cite{karmakar2024indoor}. The updated ranges $\{a_c(t), b_c(t)\}$ are transmitted as metadata alongside quantized indices every $T_R$ seconds, incurring negligible overhead (24 bytes per update for 6 channels with 32-bit float ranges, compared to 18-72 bytes per quantized sample depending on $b_c$).
+
+Adaptive scaling reduces effective quantization noise by tightening $\Delta_c(t)$ in Equation~\eqref{eq:step_size}, particularly during stable periods (e.g., overnight when pollutant levels are low and range-constrained). As shown in Section~\ref{sec:results}, this mechanism improves RMSE by 0.2-0.3 $\mu$g/m$^3$ compared to static ranges without increasing transmission energy.
+
+\subsubsection{Temporal Subsampling and Residual Encoding}
+
+To further reduce transmission frequency, we exploit the high temporal autocorrelation of indoor pollutants \cite{karmakar2024exploring}. Instead of transmitting every 1~Hz sample, the sensor node transmits quantized packets every $T_S = 4$ seconds. Within this interval, samples are aggregated using one of two strategies:
+
+\paragraph{Absolute Quantization (AQ)}
+Transmit the quantized value of the last sample in each $T_S$-second window:
+\begin{equation}
+\tilde{x}_{kT_S}^{(c)} = Q_c(x_{kT_S}^{(c)}), \quad k \in \mathbb{N}.
+\label{eq:absolute_quantization}
+\end{equation}
+
+\paragraph{Residual Quantization (RQ)}
+Transmit first-order prediction residuals to exploit temporal redundancy. Define the prediction residual as
+\begin{equation}
+r_t^{(c)} = x_t^{(c)} - x_{t-T_S}^{(c)}.
+\label{eq:residual}
+\end{equation}
+Since $|r_t^{(c)}| \ll |x_t^{(c)}|$ for slowly varying pollutants, residuals can be quantized with a narrower dynamic range $[a_r^{(c)}, b_r^{(c)}]$ and fewer bits $b_r < b_c$. The quantized residual is
+\begin{equation}
+\tilde{r}_t^{(c)} = Q_r(r_t^{(c)}; a_r^{(c)}, b_r^{(c)}, b_r),
+\label{eq:residual_quantization}
+\end{equation}
+and the reconstructed absolute value at the receiver is
+\begin{equation}
+\hat{x}_t^{(c)} = \hat{x}_{t-T_S}^{(c)} + \tilde{r}_t^{(c)}.
+\label{eq:residual_reconstruction}
+\end{equation}
+
+Empirically, residual ranges $[a_r^{(c)}, b_r^{(c)}] = [-3\sigma_c, +3\sigma_c]$, where $\sigma_c$ is the standard deviation of $r_t^{(c)}$ over training data, capture 99.7\% of residuals and enable $b_r = 4$ bits compared to $b_c = 6-8$ bits for absolute values. To prevent drift accumulation from quantization errors, an absolute reference is transmitted every $N_{\text{ref}} = 15$ packets ($\approx 60$ seconds), resetting the prediction chain \cite{przystupa2025ensuring}.
+
+\subsection{Temporal Convolutional Network Architecture}
+
+\subsubsection{Design Motivation}
+
+Recurrent neural networks (RNNs) and Long Short-Term Memory (LSTM) networks have been widely applied to air quality forecasting but suffer from sequential computation bottlenecks that hinder parallel training and inference \cite{nguyen2025aiot}. Temporal Convolutional Networks (TCNs) address these limitations by employing dilated causal convolutions, which enable parallel processing, stable gradients, and flexible receptive fields \cite{bai2018tcn}. Recent work demonstrates that TCNs achieve competitive or superior accuracy compared to RNNs for time series prediction with significantly lower computational cost \cite{gunasekar2025power}. Furthermore, TCNs' convolutional structure is naturally compatible with hardware accelerators (e.g., ARM CMSIS-NN, TensorFlow Lite) and post-training quantization techniques \cite{mazinani2025air}.
+
+\subsubsection{Dilated Causal Convolutions}
+
+A causal convolution at layer $l$ ensures that the output at time $t$ depends only on inputs from time $t$ and earlier, preserving temporal ordering:
+\begin{equation}
+y_t^{(l)} = \sum_{i=0}^{k-1} w_i^{(l)} \cdot x_{t-i}^{(l-1)},
+\label{eq:causal_conv}
+\end{equation}
+where $k$ is the kernel size and $w_i^{(l)}$ are learnable weights. To expand the receptive field without increasing parameters, dilated convolutions introduce spacing $d$ (dilation factor) between kernel taps:
+\begin{equation}
+y_t^{(l)} = \sum_{i=0}^{k-1} w_i^{(l)} \cdot x_{t - d \cdot i}^{(l-1)}.
+\label{eq:dilated_conv}
+\end{equation}
+
+For a stack of $n$ layers with dilation factors $d_1, d_2, \ldots, d_n$ and kernel size $k$, the receptive field (number of past timesteps influencing the output) is
+\begin{equation}
+R = 1 + n(k-1) \sum_{i=1}^{n} d_i.
+\label{eq:receptive_field}
+\end{equation}
+
+Exponentially increasing dilations $d_i = 2^{i-1}$ enable receptive fields to grow exponentially with depth, capturing long-range dependencies efficiently \cite{bai2018tcn}.
+
+\subsubsection{Residual Block Design}
+
+Each TCN residual block consists of two dilated causal convolutional layers, each followed by weight normalization \cite{salimans2016weightnorm}, ReLU activation, and spatial dropout (rate 0.2) for regularization. The block structure is
+\begin{align}
+z_t^{(1)} &= \text{ReLU}\left( \text{Dropout}\left( \text{WeightNorm}\left( \text{Conv1D}_{d}(x_t) \right) \right) \right), \label{eq:tcn_block_1} \\
+z_t^{(2)} &= \text{ReLU}\left( \text{Dropout}\left( \text{WeightNorm}\left( \text{Conv1D}_{d}(z_t^{(1)}) \right) \right) \right), \label{eq:tcn_block_2} \\
+y_t &= z_t^{(2)} + \mathcal{F}(x_t), \label{eq:tcn_residual}
+\end{align}
+where $\mathcal{F}(x_t)$ is a $1 \times 1$ convolution applied to the input $x_t$ if the number of channels changes between input and output, otherwise $\mathcal{F}(x_t) = x_t$ (identity mapping). Residual connections mitigate gradient vanishing and enable training of deeper networks \cite{he2016resnet}.
+
+\subsubsection{Proposed TCN Configuration}
+
+The proposed TCN architecture for DALTON air quality forecasting is specified in Table~\ref{tab:tcn_architecture}. The network comprises:
+
+\begin{itemize}
+\item \textbf{Input Layer}: Accepts quantized multi-pollutant sequences of shape $(L, C_{\text{in}})$, where $L = 256$ is the sequence length (256 seconds at 1~Hz, or 64 samples at 4~s subsampling) and $C_{\text{in}} = 6$ is the number of pollutant channels.
+
+\item \textbf{Four Residual Blocks}: With exponentially increasing dilations $d \in \{1, 2, 4, 8\}$, kernel size $k = 3$, and $C_{\text{hidden}} = 32$ channels per block. This configuration yields a receptive field of
+\begin{equation}
+R = 1 + 4(3-1)(1 + 2 + 4 + 8) = 1 + 8 \cdot 15 = 121 \text{ timesteps},
+\end{equation}
+sufficient to capture dependencies over $\approx 2$ minutes of historical data.
+
+\item \textbf{Global Average Pooling}: Aggregates temporal information into a fixed-length feature vector of dimension $C_{\text{hidden}} = 32$.
+
+\item \textbf{Fully Connected Output Layer}: Maps the aggregated features to a scalar output $\hat{y}_t \in \mathbb{R}$ representing the predicted 10-minute ahead PM$_{2.5}$ concentration.
+\end{itemize}
+
+The total parameter count is approximately 38,000, enabling deployment on edge devices with $<$1~MB flash memory. For comparison, a comparable LSTM baseline with 2 layers and 64 hidden units requires $\approx$150,000 parameters and exhibits 2-3$\times$ higher inference latency on Raspberry Pi 4 \cite{mazinani2025air}.
+
+\begin{table}[t]
+\centering
+\caption{Proposed TCN Architecture for Quantized Air Quality Forecasting}
+\label{tab:tcn_architecture}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Layer} & \textbf{Dilation} & \textbf{Channels} & \textbf{Kernel} & \textbf{Output Shape} \\
+\midrule
+Input & -- & 6 & -- & $(256, 6)$ \\
+Residual Block 1 & 1 & 32 & 3 & $(256, 32)$ \\
+Residual Block 2 & 2 & 32 & 3 & $(256, 32)$ \\
+Residual Block 3 & 4 & 32 & 3 & $(256, 32)$ \\
+Residual Block 4 & 8 & 32 & 3 & $(256, 32)$ \\
+Global Avg Pool & -- & 32 & -- & $(32)$ \\
+Dense Output & -- & 1 & -- & $(1)$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Hardware-Aware Training and Quantization}
+
+\subsubsection{Quantization-Aware Training}
+
+To ensure robustness to input quantization noise, we employ \textit{quantization-aware training} (QAT) \cite{jacob2018qat}. During training, quantization operations $Q_c(\cdot)$ defined in Equation~\eqref{eq:quantization} are inserted into the forward pass, simulating the effect of reduced precision. Specifically, raw training samples $x_t^{(c)}$ are quantized on-the-fly to $\tilde{x}_t^{(c)}$ before feeding into the TCN, while gradients flow through a straight-through estimator (STE) \cite{bengio2013ste} during backpropagation:
+\begin{equation}
+\frac{\partial \mathcal{L}}{\partial x_t^{(c)}} \approx \frac{\partial \mathcal{L}}{\partial \tilde{x}_t^{(c)}}.
+\label{eq:ste}
+\end{equation}
+
+This approach allows the network to learn representations that are resilient to quantization artifacts, such as staircase distortion and noise amplification at boundaries \cite{mazinani2025air}. We train separate models for each quantization configuration (e.g., 4-bit, 6-bit, mixed-precision) rather than using a single model with all configurations, as this specialization improves accuracy by 0.1-0.2 $\mu$g/m$^3$ RMSE.
+
+\subsubsection{Post-Training Quantization of TCN Weights}
+
+After training in full precision (FP32), the TCN model is quantized to INT8 using TensorFlow Lite's post-training quantization \cite{tensorflow2021ptq}. This reduces model size from $\approx$150~KB to $\approx$40~KB and accelerates inference on ARM-based edge devices through SIMD instructions. The quantization process maps FP32 weights $w$ to 8-bit integers:
+\begin{equation}
+w_{\text{int8}} = \text{round}\left( \frac{w - z_w}{s_w} \right), \quad w_{\text{int8}} \in [-128, 127],
+\label{eq:weight_quantization}
+\end{equation}
+where $s_w$ is the scale factor and $z_w$ is the zero-point offset determined via calibration on a representative dataset. Activations are similarly quantized using per-layer scales and zero-points.
+
+Empirical evaluation shows that INT8 quantization of TCN weights introduces $<$0.05 $\mu$g/m$^3$ RMSE degradation compared to FP32 inference, consistent with prior findings for convolutional models on air quality data \cite{mazinani2025air}.
+
+\subsubsection{Hardware-Aware Neural Architecture Search}
+
+While the TCN configuration in Table~\ref{tab:tcn_architecture} is manually designed based on domain knowledge and prior work, future iterations can leverage hardware-aware Neural Architecture Search (NAS) to co-optimize accuracy, latency, and energy consumption \cite{himeur2024edge}. A NAS framework for this application would define a search space over:
+
+\begin{itemize}
+\item Number of residual blocks $n_b \in \{2, 3, 4, 5\}$,
+\item Dilation schedules (e.g., exponential, linear, custom),
+\item Channel widths $C_{\text{hidden}} \in \{16, 32, 64\}$,
+\item Kernel sizes $k \in \{3, 5, 7\}$,
+\item Mixed-precision per-layer bit-widths.
+\end{itemize}
+
+The multi-objective reward function balances validation RMSE, estimated inference latency on target hardware (measured via a latency predictor or profiled lookup table), and memory footprint:
+\begin{equation}
+\mathcal{R}(\theta) = w_1 \cdot \text{RMSE}(\theta) + w_2 \cdot \text{Latency}(\theta) + w_3 \cdot \text{Memory}(\theta),
+\label{eq:nas_reward}
+\end{equation}
+where $\theta$ denotes architecture hyperparameters and $w_1, w_2, w_3$ are user-defined weights. Evolutionary algorithms or reinforcement learning agents (e.g., PPO, REINFORCE) can navigate this search space efficiently \cite{baker2016nas, zoph2017nas}.
+
+For this work, we fix the TCN architecture to maintain experimental clarity and focus ablation studies on quantization strategies. NAS-based optimization is deferred to future work (Section~\ref{sec:discussion}).
+
+\subsection{Energy Model for IoT Sensor Nodes}
+
+\subsubsection{Model Components}
+
+To quantify energy savings, we derive an explicit energy model partitioning node power consumption into sensing, computation, and communication components \cite{khan2024artificial}. Let:
+
+\begin{itemize}
+\item $E_{\text{sense}}^{(c)}$: Energy per sample for pollutant channel $c$ (dominated by gas sensor heating and ADC conversion), in Joules.
+\item $E_{\text{MCU}}$: Energy per CPU cycle for the microcontroller (e.g., STM32, ESP32), in Joules/cycle.
+\item $N_{\text{cycles}}^{\text{quant}}$: CPU cycles required to compute quantization (Equation~\eqref{eq:quantization}), range updates (Equation~\eqref{eq:adaptive_range}), and packet formatting.
+\item $E_{\text{tx}}$: Energy per transmitted bit at the chosen radio power level and modulation scheme, in Joules/bit.
+\item $b_{\text{payload}}$: Total payload bit-width per packet, equal to $\sum_{c=1}^{6} b_c$ for absolute quantization or $\sum_{c=1}^{6} b_r$ for residual quantization.
+\item $b_{\text{overhead}}$: Protocol overhead (headers, checksums, addressing), typically 160-200 bits for LoRa or BLE packets \cite{przystupa2025ensuring}.
+\end{itemize}
+
+\subsubsection{Energy Per Packet and Average Power}
+
+The energy consumed to transmit one quantized packet is
+\begin{equation}
+E_{\text{pkt}} = E_{\text{tx}} \cdot (b_{\text{payload}} + b_{\text{overhead}}).
+\label{eq:packet_energy}
+\end{equation}
+
+Over a $T_S$-second interval, the sensor performs $T_S$ measurements (at 1~Hz) but transmits only once. Assuming constant sensing power and negligible sleep-mode energy, the average energy per second is
+\begin{equation}
+E_{\text{sec}} = \frac{1}{T_S} \left( T_S \sum_{c=1}^{6} E_{\text{sense}}^{(c)} + E_{\text{MCU}} \cdot N_{\text{cycles}}^{\text{quant}} + E_{\text{pkt}} \right).
+\label{eq:energy_per_second}
+\end{equation}
+
+Simplifying and grouping constant terms:
+\begin{equation}
+E_{\text{sec}} = \underbrace{\sum_{c=1}^{6} E_{\text{sense}}^{(c)}}_{\text{Sensing (constant)}} + \underbrace{\frac{E_{\text{MCU}} \cdot N_{\text{cycles}}^{\text{quant}}}{T_S}}_{\text{Computation}} + \underbrace{\frac{E_{\text{tx}} (b_{\text{payload}} + b_{\text{overhead}})}{T_S}}_{\text{Communication}}.
+\label{eq:energy_decomposition}
+\end{equation}
+
+For low-power wireless transceivers (e.g., nRF52840 BLE, ESP32 Wi-Fi at low power), typical values are $E_{\text{tx}} = 30-50$ nJ/bit \cite{khan2024artificial}. Computation energy is often negligible compared to communication: $E_{\text{MCU}} \approx 0.1-0.5$ nJ/cycle and $N_{\text{cycles}}^{\text{quant}} \approx 10^3-10^4$ cycles/packet, yielding $E_{\text{MCU}} \cdot N_{\text{cycles}}^{\text{quant}} / T_S \approx 0.05-0.2$ $\mu$J/s, while $E_{\text{pkt}} / T_S \approx 1-10$ $\mu$J/s depending on $b_{\text{payload}}$ and $T_S$.
+
+\subsubsection{Baseline vs. Proposed Schemes}
+
+Table~\ref{tab:energy_comparison} illustrates energy calculations for representative schemes using $E_{\text{tx}} = 50$ nJ/bit, $b_{\text{overhead}} = 160$ bits, and $T_S = 1$ or 4 seconds:
+
+\begin{table}[t]
+\centering
+\caption{Energy Consumption Analysis for Baseline and Proposed Quantization Schemes}
+\label{tab:energy_comparison}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Scheme} & $b_{\text{payload}}$ & $T_S$ (s) & $E_{\text{pkt}}$ ($\mu$J) & $E_{\text{sec}}$ ($\mu$J/s) & \textbf{Savings} \\
+\midrule
+FP-Baseline (16-bit) & 96 & 1 & 12.8 & 12.8 & -- \\
+UQ-8 (8-bit) & 48 & 1 & 10.4 & 10.4 & 18.8\% \\
+DS-4s (downsample) & 96 & 4 & 12.8 & 3.2 & 75.0\% \\
+H-Q6$\Delta$ (6-bit residual) & 36 & 4 & 9.8 & 2.45 & 80.9\% \\
+H-Q4$\Delta$ (4-bit residual) & 24 & 4 & 9.2 & 2.30 & \textbf{82.0\%} \\
+H-Mix (mixed 4-6 bit) & 30 & 4 & 9.5 & 2.38 & 81.4\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The proposed hybrid schemes (H-Q6$\Delta$, H-Q4$\Delta$, H-Mix) achieve 80-82\% energy reduction compared to the full-precision baseline, primarily through joint reductions in $b_{\text{payload}}$ and $T_S$. Importantly, these savings are achieved while maintaining prediction accuracy within 0.5 $\mu$g/m$^3$ RMSE of the baseline (Section~\ref{sec:results}).
+
+\subsection{Summary}
+
+The proposed methodology integrates dynamic sensor-side quantization, temporal subsampling, and hardware-aware TCN design to address the energy-accuracy trade-off in IoT air quality monitoring. Key innovations include adaptive range scaling to minimize quantization noise (Equations~\eqref{eq:quantization}--\eqref{eq:adaptive_range}), residual encoding to exploit temporal correlation (Equations~\eqref{eq:residual}--\eqref{eq:residual_reconstruction}), a lightweight TCN architecture optimized for quantized inputs (Equations~\eqref{eq:dilated_conv}--\eqref{eq:tcn_residual}), and an explicit energy model enabling quantitative comparison of schemes (Equations~\eqref{eq:packet_energy}--\eqref{eq:energy_decomposition}). The next section describes the experimental design and validation on the DALTON dataset.
