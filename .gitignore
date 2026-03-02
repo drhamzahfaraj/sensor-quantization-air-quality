@@ -1,0 +1,64 @@
+# LaTeX auxiliary files
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.idx
+*.ilg
+*.ind
+
+# LaTeX temporary files
+*.bak
+*.sav
+*~
+
+# PDF outputs (uncomment if you don't want to track compiled PDFs)
+# *.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Data files (add specific patterns if needed)
+*.csv
+*.h5
+*.hdf5
+*.pkl
+*.pickle
+data/raw/*
+!data/raw/.gitkeep
+
+# Results and figures (optional, comment out if you want to track these)
+results/figures/*.png
+results/figures/*.pdf
+results/tables/*.tex
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

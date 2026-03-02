@@ -1,0 +1,45 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{multirow}
+
+\begin{document}
+
+\title{Optimizing Sensor Quantisation for Energy Saving and Reduced Complexity in Air Quality Monitoring Using IoT and AI Techniques}
+
+\author{\IEEEauthorblockN{Your Name}
+\IEEEauthorblockA{\textit{Department/Institution} \\
+\textit{University/Organization}\\
+City, Country \\
+email@domain.com}
+}
+
+\maketitle
+
+\begin{abstract}
+Low-cost Internet of Things (IoT) air quality monitoring systems face a critical trade-off between temporal resolution, measurement accuracy, and energy consumption. This paper proposes a novel hybrid scheme that integrates sensor-side dynamic quantization with hardware-aware temporal convolutional networks (TCNs) to optimize energy efficiency while maintaining prediction accuracy. Using the DALTON indoor air quality dataset comprising 89.1 million samples from 30 sites, we demonstrate that 4-6 bit quantization coupled with temporal subsampling and residual encoding achieves up to 82\% energy reduction compared to full-precision transmission, with minimal degradation in forecasting performance (RMSE increase of only 0.5 $\mu$g/m$^3$ for PM$_{2.5}$ prediction). Our methodology combines dynamic range adaptation every 300 seconds, delta coding with 4-second intervals, and an INT8-quantized TCN deployed at edge gateways. Experimental results across diverse indoor environments validate the scheme's generalizability and practical viability for battery-powered, dense sensor deployments in resource-constrained settings.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Edge AI, sensor quantization, temporal convolutional networks, IoT air quality monitoring, energy optimization, hardware-aware neural architecture search, DALTON dataset
+\end{IEEEkeywords}
+
+\input{sections/01_introduction}
+\input{sections/02_related_work}
+\input{sections/03_dataset_formulation}
+\input{sections/04_methodology}
+\input{sections/05_experiments}
+\input{sections/06_results}
+\input{sections/07_discussion}
+\input{sections/08_conclusion}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
