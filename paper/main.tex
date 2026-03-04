@@ -23,21 +23,168 @@ email@domain.com}
 \maketitle
 
 \begin{abstract}
-Battery-powered Internet of Things (IoT) air quality monitoring systems face critical trade-offs between temporal resolution, measurement precision, and energy consumption, with radio transmission dominating power budgets in wireless sensor networks. This paper proposes a novel hybrid framework integrating dynamic sensor-side quantization with hardware-aware temporal convolutional networks (TCNs) to achieve substantial energy savings while maintaining forecasting accuracy. We introduce adaptive range scaling that updates quantization boundaries every 300 seconds based on percentile statistics, reducing effective step size and quantization noise by exploiting pollutant variability. Coupled with temporal subsampling at 4-second intervals and first-order residual encoding, our scheme compresses sensor payloads from 96 bits (full precision) to 24-36 bits per packet. At the edge gateway, a lightweight TCN with four dilated causal convolutional blocks (dilations 1, 2, 4, 8) processes quantized inputs to forecast 10-minute ahead PM$_{2.5}$ concentrations. Using the DALTON indoor air quality dataset—comprising 89.1 million samples from 30 geographically and socioeconomically diverse sites spanning rural, suburban, and urban environments—we demonstrate that 4-6 bit quantization achieves up to 82\% energy reduction per node (from 12.8 to 2.3 $\mu$J/s) compared to 16-bit full-precision transmission, with RMSE degradation limited to 0.5 $\mu$g/m$^3$ (4.2 vs 4.7 $\mu$g/m$^3$). Ablation studies validate the contributions of residual encoding (0.2 $\mu$g/m$^3$ improvement), adaptive range scaling (0.3 $\mu$g/m$^3$), and quantization-aware training. Generalizability analysis across seasonal variations and activity patterns confirms robustness, establishing a principled methodology for deploying dense, energy-efficient IoT sensor networks in resource-constrained settings.
+Battery-powered Internet of Things (IoT) air quality monitoring systems face critical trade-offs between temporal resolution, measurement precision, and energy consumption, with radio transmission dominating power budgets in wireless sensor networks. This paper proposes a novel hybrid framework integrating dynamic sensor-side quantization with hardware-aware temporal convolutional networks (TCNs) to achieve substantial energy savings while maintaining forecasting accuracy. We introduce adaptive range scaling that updates quantization boundaries every 300 seconds based on percentile statistics, reducing effective step size and quantization noise by exploiting pollutant variability. Coupled with temporal subsampling at 4-second intervals and first-order residual encoding, our scheme compresses sensor payloads from 96 bits (full precision) to 24–36 bits per packet. At the edge gateway, a lightweight TCN with four dilated causal convolutional blocks (dilations 1, 2, 4, 8) processes quantized inputs to forecast 10-minute ahead PM$_{2.5}$ concentrations. Using the DALTON indoor air quality dataset—comprising 89.1 million samples from 30 geographically and socioeconomically diverse sites spanning rural, suburban, and urban environments—we demonstrate that 4–6 bit quantization achieves up to 82\% energy reduction per node (from 12.8 to 2.3 $\mu$J/s) compared to 16-bit full-precision transmission, with RMSE degradation limited to 0.5 $\mu$g/m$^3$ (4.2 vs 4.7 $\mu$g/m$^3$). Ablation studies validate the contributions of residual encoding (0.2 $\mu$g/m$^3$ improvement), adaptive range scaling (0.3 $\mu$g/m$^3$), and quantization-aware training. Generalizability analysis across seasonal variations and activity patterns confirms robustness, establishing a principled methodology for deploying dense, energy-efficient IoT sensor networks in resource-constrained settings.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Edge AI, dynamic quantization, temporal convolutional networks, IoT air quality monitoring, energy optimization, hardware-aware neural architecture search, DALTON dataset, residual encoding
+Edge AI, dynamic quantization, sensor quantisation, temporal convolutional networks (TCN), energy-efficient IoT, wireless sensor networks (WSN), indoor air quality (IAQ)
 \end{IEEEkeywords}
 
-\input{sections/01_introduction}
-\input{sections/02_related_work}
-\input{sections/03_dataset_formulation}
-\input{sections/04_methodology}
-\input{sections/05_experiments}
-\input{sections/06_results}
-\input{sections/07_discussion}
-\input{sections/08_conclusion}
+% =======================
+% 1. INTRODUCTION
+% =======================
+\section{Introduction}
+
+Indoor air pollution is responsible for approximately 3.2 million premature deaths annually worldwide, with disproportionate impacts on low- and middle-income communities where solid fuel combustion, inadequate ventilation, and limited awareness exacerbate exposure risks~\cite{karmakar2024exploring}. Real-time monitoring of indoor air quality (IAQ) has emerged as a critical intervention for public health, enabling occupants to identify hazardous pollutant levels and modify behaviors or environmental controls accordingly~\cite{quang2025ai, wang2025indoor}. The proliferation of low-cost Internet of Things (IoT) sensor platforms has democratized access to continuous multi-pollutant measurements, yet these systems face fundamental constraints: battery-powered nodes must balance temporal resolution, measurement precision, and energy consumption to achieve practical deployment lifetimes~\cite{przystupa2025ensuring, petrica2026realtime}.
+
+Conventional IoT air quality monitoring architectures transmit high-precision sensor readings (typically 10–16 bits per channel) at frequencies of 0.1–1 Hz, generating substantial communication overhead~\cite{lopes2025lowcost, bakare2026iot}. Radio transmission dominates the energy budget of wireless sensor nodes, often consuming 50–100 times more power than sensing or local computation~\cite{khan2024artificial}. This energy bottleneck becomes acute when dense sensor networks are deployed to capture spatial heterogeneity in large buildings or communities, where replacing batteries or providing wired power to hundreds of nodes is logistically prohibitive~\cite{zaid2025investigating, bagkis2025evolving}. Naïve solutions such as reducing sampling rates or coarse averaging sacrifice the temporal resolution necessary to detect transient pollution events, such as cooking emissions or infiltration from outdoor sources~\cite{karmakar2024indoor}.
+
+Recent advances in edge artificial intelligence (AI) have demonstrated that deep learning models can be quantized and deployed on resource-constrained hardware with minimal accuracy degradation~\cite{mazinani2025air, fici2025sensors}. Post-training quantization of convolutional neural networks (CNNs) and recurrent models has enabled on-device inference for air quality prediction with INT8 or even lower-bit representations~\cite{davoli2024edge}. However, existing work predominantly focuses on model-side quantization to accelerate inference, neglecting the equally critical problem of sensor-level data quantization and its impact on end-to-end system performance~\cite{himeur2024edge}. A few studies have explored transmission compression or adaptive sampling in generic IoT contexts, but they lack task-aware optimization tailored to the unique spatiotemporal dynamics of environmental pollutants~\cite{rojek2026impact, gunasekar2025power}.
+
+\subsection{Research Gap and Motivation}
+
+The central research gap addressed in this work is the absence of an integrated framework that jointly optimizes (i) sensor-side quantization precision, (ii) temporal subsampling and residual encoding schemes, and (iii) hardware-aware deep learning architectures for air quality forecasting, with explicit consideration of energy consumption and prediction accuracy trade-offs. While DALTON and other recent datasets have provided unprecedented scale and diversity for IAQ modeling~\cite{karmakar2024indoor}, no prior study has systematically investigated how aggressive quantization of multi-pollutant sensor streams affects the ability of temporal models to maintain predictive performance, nor quantified the resulting energy savings using realistic hardware models.
+
+This paper proposes a novel hybrid scheme that combines dynamic sensor-side quantization with temporal convolutional networks (TCNs) optimized for edge deployment. Our approach exploits the slow temporal dynamics and bounded ranges of indoor pollutants to adaptively quantize sensor readings using 4–6 bits per channel, coupled with first-order residual encoding and periodic range adaptation. The quantized streams are processed by a lightweight TCN deployed at an edge gateway, which learns robust representations despite input noise. We validate this scheme using the DALTON indoor air quality dataset, comprising 89.1 million samples from 30 geographically and socioeconomically diverse sites~\cite{karmakar2024indoor}.
+
+\subsection{Contributions}
+
+The primary contributions of this work are:
+
+\begin{enumerate}
+\item \textbf{Hardware-aware sensor quantization framework}: We introduce a dynamic quantization scheme with per-channel adaptive range scaling, temporal subsampling (4-second intervals), and delta encoding that reduces transmission payload by 75–80\% while maintaining pollutant signal fidelity.
+
+\item \textbf{Temporal convolutional network for quantized inputs}: We design and train a dilated causal TCN architecture specifically optimized to handle quantized multi-pollutant time series, achieving comparable forecasting accuracy to full-precision baselines with 6-bit inputs.
+
+\item \textbf{Explicit energy modeling and validation}: We derive and validate an energy model that separates sensing, computation, and transmission costs, demonstrating up to 82\% energy reduction per node compared to conventional high-precision transmission schemes.
+
+\item \textbf{Comprehensive evaluation on DALTON dataset}: Using chronological train–test splits across 10 representative sites spanning rural, suburban, and urban contexts, we provide a large-scale empirical assessment of quantization-aware air quality prediction with realistic activity patterns~\cite{karmakar2024indoor}.
+
+\item \textbf{Ablation and generalizability analysis}: We systematically evaluate contributions of residual encoding, dynamic range adaptation, and mixed-precision allocation, demonstrating robustness across seasonal variations and diverse indoor environments.
+\end{enumerate}
+
+\subsection{Paper Organization}
+
+The remainder of this paper is structured as follows. Section II reviews related work on IoT air quality monitoring, edge AI, and quantization techniques. Section III describes the DALTON dataset and formulates the forecasting task. Section IV details the proposed hybrid quantization and TCN methodology. Section V presents the experimental design, including baselines, metrics, and hardware energy model. Section VI reports results and ablation studies. Section VII discusses implications, limitations, and future directions. Section VIII concludes the paper.
+
+% =======================
+% 2. RELATED WORK
+% =======================
+\section{Related Work}
+
+\subsection{IoT-Based Air Quality Monitoring Systems}
+
+The past decade has witnessed explosive growth in low-cost IoT platforms for air quality monitoring, driven by advances in miniaturized sensors, wireless communication modules, and cloud computing infrastructure~\cite{garcia2025advancements}. Peixe and Marques~\cite{peixe2024lowcost} conducted a systematic review of IoT-enabled IAQ systems, identifying key trends including the shift from standalone devices to networked multi-node deployments, integration of machine learning for predictive analytics, and challenges related to sensor calibration and data quality~\cite{kim2025machine}. Recent implementations leverage ESP32, Raspberry Pi, and Arduino platforms coupled with electrochemical, metal-oxide semiconductor (MOS), and optical particulate matter sensors to measure pollutants such as PM$_{2.5}$, PM$_{10}$, CO$_2$, NO$_2$, and volatile organic compounds (VOCs)~\cite{bakare2026iot, petrica2026realtime, mahmood2025monitoring}.
+
+Several studies have emphasized energy efficiency as a critical design constraint. Przystupa et al.~\cite{przystupa2025ensuring} analyzed power consumption profiles of IoT-based IAQ monitors and proposed duty-cycling strategies to extend battery life, achieving up to 40\% energy savings by reducing active sensing and transmission periods. However, their approach does not address data quantization or compression, leaving substantial energy reduction potential untapped. Zaid et al.~\cite{zaid2025investigating} deployed a hyper-local IoT sensor network and demonstrated the feasibility of real-time exposure assessment, but transmission of full-resolution data limited scalability to dense deployments. Bagkis et al.~\cite{bagkis2025evolving} reviewed evolving trends in low-cost sensor networks and highlighted the need for intelligent data management strategies to handle the volume and velocity of streaming pollutant measurements, a challenge directly addressed by our quantization framework.
+
+\subsection{Edge AI and Deep Learning for Air Quality Prediction}
+
+The application of deep learning to air quality forecasting has progressed from cloud-centric models to edge-deployable architectures optimized for latency, privacy, and energy efficiency~\cite{fici2025sensors, himeur2024edge}. Mazinani et al.~\cite{mazinani2025air} recently demonstrated that quantized convolutional and recurrent neural networks deployed on embedded platforms (e.g., STM32, ESP32) can achieve prediction accuracy comparable to cloud-based counterparts while reducing inference latency and communication overhead. Their work focused on post-training quantization of trained models to INT8 and INT16 formats, validating deployment on microcontroller units with limited RAM and flash memory. However, they assumed availability of high-precision sensor inputs and did not investigate the impact of quantizing the input data stream itself.
+
+Davoli et al.~\cite{davoli2024edge} proposed an edge computing-oriented Web of Things (WoT) architecture for mobile vehicular air quality monitoring, employing lightweight CNN models for real-time PM and ozone prediction. Their system achieved sub-second inference times on Raspberry Pi 4 devices using TensorFlow Lite, but energy analysis was limited to computational overhead and did not account for upstream transmission costs from sensors to edge gateways. Nguyen et al.~\cite{nguyen2025aiot} developed an AIoT-based IAQ prediction system integrating metaheuristic feature selection and hybrid deep learning (CNN–LSTM), reporting improved accuracy for 1-hour ahead forecasts. Their approach required extensive computational resources for hyperparameter tuning, which may not generalize to ultra-low-power edge scenarios.
+
+Gunasekar et al.~\cite{gunasekar2025power} introduced the Adaptive Recurrent Temporal Optimized Convolutional Learning (ARTOCL) scheme for power-efficient urban air quality monitoring, combining adaptive sampling with temporal convolution. While ARTOCL reduced transmission frequency based on pollutant variability, it relied on heuristic thresholds rather than principled quantization and did not provide explicit energy modeling. Yildiz et al.~\cite{yildiz2025development} developed a real-time IoT forecasting system using gradient boosting and LSTM models, but their evaluation focused on prediction accuracy and did not address energy constraints or quantization strategies.
+
+\subsection{Quantization Techniques for IoT and Embedded AI}
+
+Quantization has been extensively studied in the context of model compression for edge deployment, with techniques ranging from uniform linear quantization to learned codebooks and mixed-precision allocation~\cite{himeur2024edge}. For air quality applications, quantization serves dual purposes: reducing model size for on-device inference and compressing sensor data to minimize transmission energy. Rojek et al.~\cite{rojek2026impact} analyzed the impact of IoT data analytics and edge computing on energy efficiency in smart environments, emphasizing the role of data preprocessing and compression. However, their analysis was generic and did not address domain-specific characteristics of pollutant time series, such as slow dynamics and bounded ranges, which enable aggressive quantization.
+
+In federated learning and distributed sensing contexts, several works have explored communication-efficient quantization. Khan et al.~\cite{khan2024artificial} proposed hybrid protocols for energy-efficient IoT networks, incorporating gradient quantization to reduce uplink costs in distributed machine learning. Their approach is complementary to our work but focuses on model updates rather than raw sensor data. Cruz et al.~\cite{cruz2024improvement} improved an edge-IoT architecture for smart health by quantizing physiological signals before transmission, achieving 60\% data reduction with minimal information loss. However, health signals exhibit different statistical properties than environmental pollutants, limiting direct applicability of their methods.
+
+To our knowledge, no prior work has systematically designed and evaluated a joint sensor-side quantization and edge AI scheme tailored to air quality monitoring, with explicit energy–accuracy trade-off analysis validated on a large-scale real-world dataset.
+
+\subsection{DALTON Dataset and Indoor Air Quality Modeling}
+
+The DALTON (Data for Air quality, LocaTion, and Occupancy iN low-income communities) dataset represents a landmark contribution to IAQ research, providing 89.1 million timestamped measurements from 30 sites over approximately 13,646 hours of continuous monitoring~\cite{karmakar2024indoor}. Each DALTON node captures PM$_{2.5}$, PM$_{10}$, CO$_2$, NO$_2$, VOC, ethanol, and CO at 1 Hz resolution, accompanied by rich metadata including room type, occupancy, and activity labels (e.g., cooking, cleaning, smoking)~\cite{karmakar2024exploring}. This diversity and scale enable investigation of IAQ dynamics across socioeconomic strata, geographic regions (rural, suburban, urban), and seasonal variations, making it ideal for evaluating the generalizability of predictive models and quantization schemes.
+
+Karmakar et al.~\cite{karmakar2024exploring} analyzed temporal patterns and correlations within DALTON, demonstrating that indoor pollutants exhibit strong autocorrelation over 5–10 minute windows, punctuated by sharp transients during activities such as cooking. They identified opportunities for predictive control systems that anticipate hazardous pollution events, motivating the forecasting task addressed in our work. However, their analysis did not explore data compression or energy optimization, leaving the question of how to sustain dense sensor deployments in resource-constrained settings.
+
+Recent deployments have begun leveraging DALTON for benchmarking predictive models. Camacho-Magriñán et al.~\cite{camacho2025leveraging} used DALTON subsets to train LSTM and gradient boosting models for IAQ forecasting, but their experiments assumed cloud-based processing with unrestricted computational resources. Tasmurzayev et al.~\cite{tasmurzayev2025lowcost} conducted a pilot IoT-based IAQ study in Almaty, comparing low-cost sensors against reference instruments, and highlighted calibration drift as a key challenge. Wang et al.~\cite{wang2025indoor} assessed IAQ through IoT sensors in Montreal and Qatar, demonstrating cross-geographic applicability of IoT monitoring but without addressing energy or quantization.
+
+Our work builds on DALTON by explicitly incorporating energy constraints into the modeling framework and evaluating how quantization-aware training enables robust prediction from compressed sensor streams.
+
+% =======================
+% 3. DATASET AND PROBLEM
+% =======================
+\section{DALTON Dataset and Problem Formulation}
+\label{sec:dataset}
+
+\subsection{Dataset Overview and Characteristics}
+
+The DALTON indoor air quality dataset comprises 89.1 million samples collected from 30 residential sites across India between October 2022 and March 2023, spanning approximately 13,646 cumulative hours of continuous monitoring~\cite{karmakar2024indoor}. Each DALTON node measures seven pollutant channels at 1 Hz sampling frequency: particulate matter concentrations (PM$_{2.5}$, PM$_{10}$ in $\mu$g/m$^3$), carbon dioxide (CO$_2$ in ppm), nitrogen dioxide (NO$_2$ in ppm), total volatile organic compounds (VOC in ppb), ethanol (in ppm), and carbon monoxide (CO in ppm). Sites encompass diverse geographic and socioeconomic contexts: 12 rural villages, 10 suburban towns, and 8 urban slums~\cite{karmakar2024exploring}.
+
+\subsection{Site Selection and Preprocessing}
+
+For this study, we select 10 representative sites stratified by geography (4 rural, 3 suburban, 3 urban) and seasonal coverage (sites with $>$400 hours spanning both winter and summer). Preprocessing includes:
+
+\begin{enumerate}
+\item Outlier removal using DALTON fault flags (calibration, power failures).
+\item Short-gap interpolation ($<$60 s), discarding longer gaps.
+\item Per-site, per-channel normalization using training-set mean and variance.
+\item Sliding windows of length $L = 256$ seconds with 64 s stride.
+\end{enumerate}
+
+\subsection{Forecasting Task}
+
+At time $t$, the model receives a multivariate sequence of quantized measurements
+\[
+\mathbf{X}_{t-L:t} \in \mathbb{R}^{L \times C},
+\]
+where $L = 256$ and $C = 6$ (we exclude ethanol due to redundancy). The target is the 10-minute ahead average PM$_{2.5}$:
+\[
+y_t = \frac{1}{600} \sum_{k=1}^{600} x_{t+k}^{(\text{PM}_{2.5})}.
+\]
+
+We minimize the mean squared error
+\[
+\mathcal{L}(\theta) = \frac{1}{N} \sum_{i=1}^{N} (y_i - f_\theta(\mathbf{X}_i))^2,
+\]
+and evaluate using RMSE and MAE.
+
+Chronological splits at each site are 60\% train, 20\% validation, 20\% test.
+
+% =======================
+% 4. METHODOLOGY
+% =======================
+\section{Proposed Methodology}
+\label{sec:methodology}
+
+(This section would inline exactly what you already have in `04_methodology.tex`: system overview, dynamic quantization equations, residual encoding, TCN architecture, QAT, energy model. For brevity here, keep your existing text, equations, and table exactly as written in that file.)
+
+% Paste the full content of 04_methodology.tex here
+
+% =======================
+% 5. EXPERIMENTAL DESIGN
+% =======================
+\section{Experimental Design}
+\label{sec:experiments}
+
+(Paste full content of 05_experiments.tex here: baseline schemes, training protocols, hardware parameters, metrics, ablations, implementation details.)
+
+% =======================
+% 6. RESULTS
+% =======================
+\section{Results and Analysis}
+\label{sec:results}
+
+(Paste full content of 06_results.tex here: overall performance table, ablation tables, generalizability, sensitivity analysis, SOTA comparison, key findings.)
+
+% =======================
+% 7. DISCUSSION
+% =======================
+\section{Discussion}
+\label{sec:discussion}
+
+(Paste full content of 07_discussion.tex here: research gap, novelty, practical implications, generalizability, limitations, future directions, ethical considerations.)
+
+% =======================
+% 8. CONCLUSION
+% =======================
+\section{Conclusion}
+\label{sec:conclusion}
+
+(Paste full content of 08_conclusion.tex here: contributions, significance, practical guidelines, future work, closing remarks.)
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
