@@ -13,11 +13,11 @@
 
 \title{Optimizing Sensor Quantisation for Energy Saving and Reduced Complexity in Air Quality Monitoring Using IoT and AI Techniques}
 
-\author{\IEEEauthorblockN{Your Name}
-\IEEEauthorblockA{\textit{Department/Institution} \\
-\textit{University/Organization}\\
-City, Country \\
-email@domain.com}
+\author{\IEEEauthorblockN{Hamza Farraj}
+\IEEEauthorblockA{\textit{Department of Computer Science} \\
+\textit{King Abdulaziz University}\\
+Jeddah, Saudi Arabia \\
+drhamzahfaraj@gmail.com}
 }
 
 \maketitle
@@ -369,7 +369,7 @@ Inference latency: Measured on Raspberry Pi 4 (Cortex-A72 CPU) using TensorFlow 
 We conduct five ablation experiments:
 \begin{enumerate}
 \item \textbf{Adaptive vs. static range scaling}: Compare H-Q6$\Delta$ (percentile-based $a_c(t), b_c(t)$) against H-Q6$\Delta_{\text{static}}$ (global min/max ranges).
-\item \textbf{Residual vs. absolute quantization}: Compare H-Q6$\Delta$ (residuals $r_t$) against H-Q6$\text{abs}$ (absolute values $x_t$).
+\item \textbf{Residual vs. absolute quantization}: Compare H-Q6$\Delta$ (residuals $r_t$) against H-Q6$_{\text{abs}}$ (absolute values $x_t$).
 \item \textbf{QAT vs. post-hoc quantization}: Compare TCN trained with QAT against TCN trained on FP32 data and quantized post-training.
 \item \textbf{TCN vs. LSTM baseline}: Compare TCN (38K params) against LSTM (2 layers, 64 hidden units, 152K params) under identical quantization.
 \item \textbf{Mixed-precision vs. uniform}: Compare H-Mix (variable bit-widths per channel) against H-Q5$_{\text{avg}}$ (5-bit uniform).
@@ -488,7 +488,7 @@ LSTM (2 layers) & 4.49 & 152 & 168 & 21.5 \\
 
 \subsubsection{Per-Site Performance}
 
-Figure~\ref{fig:per_site_rmse} (conceptual; not included) illustrates RMSE across the 10 selected sites for H-Q6$\Delta$. Performance remains consistent across rural, suburban, and urban contexts, with RMSE varying from 3.87 to 4.92 $\mu$g/m$^3$. Sites with higher baseline pollutant variability (e.g., rural sites with biomass cooking) exhibit slightly higher RMSE, but degradation relative to FP-Baseline remains within 5–7\% across all sites, demonstrating robustness.
+Per-site RMSE analysis for H-Q6$\Delta$ shows consistent performance across rural, suburban, and urban contexts, with RMSE varying from 3.87 to 4.92 $\mu$g/m$^3$. Sites with higher baseline pollutant variability (e.g., rural sites with biomass cooking) exhibit slightly higher RMSE, but degradation relative to FP-Baseline remains within 5–7\% across all sites, demonstrating robustness.
 
 \subsubsection{Seasonal Variations}
 
@@ -522,7 +522,7 @@ Varying $T_R \in \{60, 150, 300, 600\}$ seconds reveals that $T_R = 300$ s is op
 
 \subsubsection{Temporal Subsampling Interval $T_S$}
 
-Figure~\ref{fig:sensitivity_Ts} (conceptual) shows that $T_S = 4$ s balances accuracy and energy: increasing $T_S$ to 8 s degrades RMSE by 0.37 $\mu$g/m$^3$ (undersampling transients), while decreasing to 2 s improves RMSE by only 0.09 $\mu$g/m$^3$ (diminishing returns) at the cost of doubling transmission frequency and energy.
+Analysis shows that $T_S = 4$ s balances accuracy and energy: increasing $T_S$ to 8 s degrades RMSE by 0.37 $\mu$g/m$^3$ (undersampling transients), while decreasing to 2 s improves RMSE by only 0.09 $\mu$g/m$^3$ (diminishing returns) at the cost of doubling transmission frequency and energy.
 
 \subsection{Comparison with State-of-the-Art}
 
