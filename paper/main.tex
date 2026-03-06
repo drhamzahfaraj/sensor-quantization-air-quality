@@ -90,7 +90,108 @@ The remainder of this paper is organised as follows. Section~\ref{sec:related_wo
 %% END OF SECTION 1
 %% ============================================================
 
-\input{sections/sec2_related_work}
+%% ============================================================
+%% SECTION 2: RELATED WORK  (drafted directly in main.tex)
+%% ============================================================
+\section{Related Work}
+\label{sec:related_work}
+
+This section reviews five bodies of literature relevant to the VABQ framework: IoT-based air quality monitoring, sensor data reduction, neural network quantisation, edge AI for environmental sensing, and ADC energy modelling. The section concludes by synthesising the research gap that motivates this work.
+
+\subsection{IoT-Based Air Quality Monitoring}
+\label{sec:rw_aqm}
+
+The deployment of low-cost sensor networks for indoor and outdoor air quality monitoring has accelerated substantially in the past five years. Karmakar et al.~(2024) developed the DALTON platform and conducted a three-month field study across 28 indoor sites in four geographic regions of India~\cite{karmakar2024exploring}. Their analysis revealed that conventional indices such as the Indoor Air Quality Index (IAQI) fail to capture complex spatio-temporal pollution dynamics driven by occupant activities. They proposed the Healthy Home Index (HHI), which integrates average pollutant exposure, statistical variation, and spatial spread over a 10-minute sliding window. The same research group later released an extended six-month dataset covering 30 sites with summer and winter seasons, accepted at the NeurIPS 2024 Datasets and Benchmarks Track~\cite{karmakar2024indoor}. This dataset includes ground-truth activity annotations from 42 occupants and eight sensor channels sampled at 1~Hz, making it one of the most comprehensive IAQ benchmarks available.
+
+Dimitriou et al.~(2025) surveyed recent innovations in air quality sensors and IoT integration, highlighting the growing role of low-cost particulate matter and gas sensors in urban and indoor environments~\cite{dimitriou2025innovations}. They identified calibration drift, cross-sensitivity, and energy constraints as the three principal challenges facing low-cost sensor networks. Sheridan et al.~(2025) introduced Enviro-IoT, a system for calibrating low-cost environmental sensors in urban settings~\cite{enviroiot2025}. Their 9-month field study demonstrated that machine learning calibration models trained on co-located reference-grade instruments can reduce root-mean-square error by 35--60\%, substantially improving the reliability of low-cost sensor data for policy-relevant air quality assessment.
+
+Forecasting IAQ has also seen methodological progress. Al-Saffar et al.~(2024) evaluated eight machine learning models---including support vector regression, random forest, gradient boosting, and recurrent neural networks---for predicting indoor pollutant concentrations~\cite{forecasting2024iaq}. LightGBM achieved the best CO$_2$ prediction performance with mean absolute percentage error (MAPE) of 0.096\%. Chang et al.~(2023) proposed a LASSO feature-selection method combined with an attention-augmented temporal convolutional network (TCN) for indoor particulate matter prediction~\cite{lassotcn2023}. Wang et al.~(2023) developed a TCN-BiLSTM-DMAttention architecture with seasonal-trend decomposition for air pollutant forecasting~\cite{tcnbilstm2023}. These TCN-based architectures confirm that the temporal structure inherent in pollutant signals---periodic diurnal cycles, weekend effects, and activity-driven transients---can be effectively exploited for prediction and classification tasks.
+
+\subsection{Sensor Data Reduction and Compression}
+\label{sec:rw_compression}
+
+Reducing sensor data volume prior to wireless transmission is a well-established strategy for conserving energy in battery-powered sensor networks. Atitallah et al.~(2023) proposed an autonomous IoT data reduction scheme based on adaptive thresholds with concept drift detection~\cite{atitallah2023autonomous}. Their method dynamically adjusts the tolerance band around the current reading using a Kalman filter that tracks signal trends. Evaluated on temperature, humidity, and CO$_2$ sensor data, the approach achieved 11.7\% accuracy improvement compared to fixed-threshold schemes at equivalent data reduction rates. The key insight is that signal stationarity varies over time, necessitating adaptive rather than static thresholds.
+
+SAX-LZW two-level compression strategies~\cite{aljanabi2022sax} discretise continuous sensor signals into symbolic representations using Symbolic Aggregate approXimation (SAX) before applying Lempel-Ziv-Welch (LZW) dictionary-based compression. This two-stage approach achieves compression ratios of 5:1 to 20:1 depending on signal entropy, with reconstruction error proportional to the SAX alphabet size. Bounded-error pruning~\cite{azar2020bounded} selectively discards readings that fall within a configurable error envelope around a linear or polynomial interpolant. Compression efficiency is directly proportional to signal stationarity: slowly varying signals achieve 90\% data reduction, while rapidly fluctuating signals yield only 20--30\% savings.
+
+Recent work has explored reinforcement learning for adaptive data delivery. Pratama et al.~(2025) employed Q-learning to optimise transmission decisions for ESP32-based air quality nodes, modelling each transmission as an action with reward defined by prediction error and energy cost~\cite{qlearning2025airquality}. Their agent learned to suppress transmissions during stable periods and increase frequency during transients, achieving 40--50\% transmission frequency reduction with negligible accuracy loss. Lopez et al.~(2023) provided a comprehensive vision for energy-sustainable IoT connectivity, identifying energy provision (harvesting, storage), energy transfer (wireless power), and energy efficiency (adaptive duty cycling, compression) as three harmonious processes that must be co-optimised~\cite{energysustainable2023}. Ferraro et al.~(2024) investigated power consumption reduction for edge devices in ambient intelligence applications, demonstrating 2--3$\times$ operational lifetime extension through combined sleep scheduling and data aggregation~\cite{reducingpower2024}.
+
+However, all these methods operate at the raw signal or communication layer without considering downstream inference model requirements. A sensor compression scheme that minimises transmission energy may inadvertently degrade the input features on which an edge AI classifier depends, resulting in accuracy loss that could have been avoided through joint optimisation.
+
+\subsection{Neural Network Quantisation}
+\label{sec:rw_quantisation}
+
+Quantisation reduces the numerical precision of neural network weights and activations, yielding proportional reductions in memory footprint, computational complexity, and energy consumption. Nagel et al.~(2021) established comprehensive theoretical foundations covering uniform and non-uniform quantisation, calibration strategies, and bit-width--accuracy trade-offs~\cite{nagel2021whitepaper}. Gholami et al.~(2021) surveyed quantisation methods, categorising approaches into post-training quantisation (PTQ), quantisation-aware training (QAT), mixed-precision quantisation, and hardware-aware quantisation~\cite{quantsurvey2021}. Their taxonomy remains the standard reference for navigating the rapidly evolving quantisation literature.
+
+PTQ methods require no retraining, making them attractive for edge deployment where computational resources are constrained. ZeroQuant~(2022) introduced token-wise quantisation for large-scale transformers, demonstrating that per-token scaling factors preserve accuracy better than per-layer or per-channel schemes~\cite{zeroquant2022}. SmoothQuant~(2024) achieved training-free W8A8 quantisation for large language models through activation-weight smoothing, a mathematically equivalent transformation that redistributes quantisation difficulty from activations to weights~\cite{smoothquant2024}. QDrop~(2023) randomly dropped quantisation during calibration, effectively training a model ensemble that is robust to quantisation noise~\cite{qdrop2023}. Q-HyViT~(2024) addressed PTQ for hybrid vision transformers on IoT systems, introducing bridge block reconstruction to preserve inter-block activation distributions~\cite{qhyvit2024}. These advances confirm that INT8 PTQ is mature for deployment on resource-constrained edge devices with accuracy degradation typically below 1\%.
+
+QAT methods incorporate quantisation into the training loop, yielding superior accuracy at ultra-low bit-widths (2--4 bits) at the cost of longer training time. EdgeQAT~(2024) introduced entropy-guided and distribution-guided training for lightweight language models on edge devices, achieving 4-bit accuracy within 0.5\% of the full-precision baseline~\cite{edgeqat2024}. EfficientQAT~(2024) demonstrated state-of-the-art 4-bit quantisation for large language models with less than 1\% perplexity increase~\cite{efficientqat2024}. HADQ-Net~(2025) presented a hardware-adaptive QAT framework that co-optimises quantisation strategy with the target accelerator's datapath, demonstrating that FP32-to-lower-bit quantisation reduces energy by up to 15$\times$ while maintaining accuracy~\cite{hadqnet2025}. Kim et al.~(2025) introduced accurate INT8 training through dynamic block-level fallback, where sensitive layers temporarily revert to FP16 during training before final INT8 conversion~\cite{accurateint8_2025}.
+
+Mixed-precision quantisation assigns different bit-widths to different layers or channels based on sensitivity analysis. DyBit~(2023) proposed dynamic bit-precision numbers that adapt exponent and mantissa allocation to weight and activation statistics per layer~\cite{dybit2023}. Dong et al.~(2024) reviewed mixed-precision methods, showing that layer-wise precision allocation guided by Hessian-based sensitivity analysis yields optimal energy-accuracy trade-offs~\cite{dong2024efficient}. Guo et al.~(2024) introduced Edge-MPQ, a tightly integrated hardware-software co-design supporting INT2, INT4, INT8, and INT16 precisions with dedicated mixed-precision multiply-accumulate units~\cite{edgempq2024}. Their RISC-V implementation achieves 15.5--47.7$\times$ speedup over baseline scalar execution, demonstrating the potential of hardware specialisation for mixed-precision inference.
+
+\subsection{Edge AI for Environmental Monitoring}
+\label{sec:rw_edgeai}
+
+The convergence of edge computing and artificial intelligence has opened new possibilities for real-time, privacy-preserving environmental monitoring. Akhyar et al.~(2025) demonstrated TinyML-based ozone prediction on Arduino Nano (32~KB SRAM, 8~MHz ATmega328P), achieving $R^2 = 0.95$ for 1-hour-ahead forecasting with a model footprint of only 12~KB~\cite{akhyar2025tinyml}. This confirms that meaningful air quality inference is feasible on extremely constrained hardware, provided the model architecture and quantisation strategy are carefully co-designed.
+
+Kwon et al.~(2024) proposed TinyTrain, a resource-aware task-adaptive sparse training framework for deep neural networks at the data-scarce edge~\cite{tinytrain2024}. By dynamically pruning weights and activations during backpropagation, TinyTrain achieves up to 1,098$\times$ memory savings compared to dense training, enabling on-device model personalisation without cloud offloading. Bauer et al.~(2025) introduced EdgeMLOps, a system for operationalising machine learning models on edge devices using the Cumulocity IoT platform and thin-edge.io middleware~\cite{edgemlops2025}. They evaluated static and dynamic INT8 quantisation on Raspberry Pi for visual quality inspection, finding that dynamic quantisation (per-batch recalibration) reduces accuracy loss from 4.2\% to 1.1\% at equivalent energy savings.
+
+Khan et al.~(2024) systematically evaluated quantisation for reducing CNN inference time on edge systems, confirming INT8 as the optimal precision for latency-accuracy balance~\cite{enhancingcnn2024}. Their experiments on ARM Cortex-A53 and Cortex-A72 processors showed that INT8 inference achieves 3.5--4.2$\times$ speedup over FP32 with less than 1\% accuracy degradation for ResNet-50 and MobileNetV2. Palakodety et al.~(2025) achieved 14.5$\times$ speedup with INT8 PTQ on a RISC-V neural processing unit at only 1.96~W average power~\cite{palakodety2025tpu}, demonstrating that specialised accelerators can deliver order-of-magnitude improvements over general-purpose CPUs.
+
+Pandey et al.~(2025) introduced machine-learning-guided resolution reconfiguration for neural recording in brain-computer interfaces~\cite{pandey2025neural}. Their method uses a decoder importance score---computed from gradient-based sensitivity analysis---to assign ADC resolution per electrode channel, achieving 8.7--23$\times$ power savings while maintaining decoding accuracy above 95\%. This work is conceptually the closest antecedent to the sensor-level component of VABQ. However, it targets a fundamentally different application domain (implanted neural interfaces with 128--256 channels sampled at 20--30~kHz) and does not address inference-level quantisation or the interaction between sensor and model precision.
+
+\subsection{ADC Energy Modelling}
+\label{sec:rw_adc}
+
+The relationship between ADC resolution and energy consumption is characterised by the Walden figure of merit (FoM)~\cite{waldenADC2018}:
+\begin{equation}
+    \text{FoM}_W = \frac{P_{\text{ADC}}}{2^{\text{ENOB}} \cdot f_s}
+    \label{eq:walden}
+\end{equation}
+where $P_{\text{ADC}}$ is ADC power consumption, ENOB is the effective number of bits, and $f_s$ is the sampling frequency. Rearranging, this implies that power scales exponentially with resolution:
+\[
+    P_{\text{ADC}} = \text{FoM}_W \cdot 2^{\text{ENOB}} \cdot f_s.
+\]
+State-of-the-art SAR ADCs achieve FoMs ranging from 0.44~fJ per conversion step (11-bit, 90~nm CMOS)~\cite{waldenADC2018} to 16.6~fJ per conversion step (8-bit, 5~nm FinFET). This exponential relationship implies that reducing effective resolution from 12 bits to 8 bits decreases ADC energy by a factor of $2^{12-8} = 16$, assuming FoM remains constant.
+
+Andrulis et al.~(2024) developed an open-source ADC energy and area model for compute-in-memory accelerator design, confirming exponential energy growth with ENOB across multiple ADC architectures (SAR, pipelined, delta-sigma)~\cite{andrulis2024adc}. Their model incorporates parasitics, reference buffering, and clock distribution overhead, providing more realistic estimates than the idealised Walden FoM. Chen et al.~(2025) demonstrated a reconfigurable 2--8 bit SAR/SS ADC fabricated in 65~nm CMOS that dynamically adjusts resolution per conversion cycle~\cite{reconfigADC2025}. By disabling comparator stages and reference voltage divisions for low-resolution modes, the design eliminates unnecessary power consumption, achieving near-ideal Walden scaling across the 2--8 bit range.
+
+Dai et al.~(2021) showed that per-vector scaled quantisation---where each activation vector has its own scaling factor rather than a single global scale---further reduces energy in low-precision systems by minimising quantisation error~\cite{vsquant2021}. Lee et al.~(2024) introduced LUTIN, a table-lookup-based inference accelerator that replaces MAC operations with memory accesses, achieving 8.3$\times$ energy reduction for INT4 inference~\cite{lutin2024}. These hardware innovations confirm that the exponential ADC energy-resolution relationship can be exploited through adaptive bit-width control, provided the reconfiguration overhead is negligible.
+
+\subsection{Research Gap and Motivation}
+\label{sec:rw_gap}
+
+Table~\ref{tab:gap} synthesises the capabilities of existing approaches and identifies the gap that VABQ addresses.
+
+\begin{table}[H]
+\centering
+\caption{Capability comparison of existing approaches versus VABQ.}
+\label{tab:gap}
+\begin{tabular}{@{}p{3.5cm}ccccc@{}}
+\toprule
+\textbf{Method} & \textbf{Year} & \textbf{Sensor} & \textbf{Infer.} & \textbf{Adaptive} & \textbf{Unified} \\
+\midrule
+Adaptive Threshold~\cite{atitallah2023autonomous} & 2023 & \checkmark & & \checkmark & \\
+SAX-LZW~\cite{aljanabi2022sax} & 2022 & \checkmark & & & \\
+Bounded-Error~\cite{azar2020bounded} & 2020 & \checkmark & & & \\
+SmoothQuant~\cite{smoothquant2024} & 2024 & & \checkmark & & \\
+EdgeQAT~\cite{edgeqat2024} & 2024 & & \checkmark & \checkmark & \\
+Q-Learning Tx~\cite{qlearning2025airquality} & 2025 & & & \checkmark & \\
+Edge-MPQ~\cite{edgempq2024} & 2024 & & \checkmark & \checkmark & \\
+Resol. Reconfig.~\cite{pandey2025neural} & 2025 & \checkmark & & \checkmark & \\
+\textbf{VABQ (Proposed)} & \textbf{2026} & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+No prior work jointly optimises sensor-level ADC bit-width and inference-level model precision for air quality monitoring. Existing adaptive sampling methods use static or slowly adapting thresholds that fail to exploit the strong periodic structure of indoor pollutant data documented by Karmakar et al.~\cite{karmakar2024exploring}. Resolution reconfiguration~\cite{pandey2025neural} targets neural interfaces with fundamentally different signal characteristics (high-frequency neural spikes versus low-frequency environmental drifts) and does not address the inference layer. Edge-MPQ~\cite{edgempq2024} optimises inference hardware through mixed-precision accelerators but treats sensor data as a fixed input. Q-learning-based transmission scheduling~\cite{qlearning2025airquality} reduces communication energy but does not reconfigure ADC resolution or quantise the inference model.
+
+The VABQ framework addresses this gap through a variance-entropy criterion that governs both sensing and inference quantisation within a unified, mathematically grounded pipeline. By exploiting the temporal structure of IAQ signals at both layers, VABQ achieves compound energy savings that exceed the sum of independent sensor-level and inference-level optimisation. This synergy---where sensor bit reduction improves PTQ effectiveness by narrowing the dynamic range---is the key insight distinguishing the proposed approach from sequential application of existing techniques.
+
+%% ============================================================
+%% END OF SECTION 2
+%% ============================================================
+
 \input{sections/sec3_methodology}
 \input{sections/sec4_experiments}
 \input{sections/sec5_results}
