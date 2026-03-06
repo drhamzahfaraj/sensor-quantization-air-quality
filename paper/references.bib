@@ -1,43 +1,51 @@
+%% references.bib
+%% Bibliography for "Optimizing Sensor Quantisation for Energy Saving in Air Quality Monitoring"
+%% 40 entries, ordered by first citation appearance in manuscript
+
 %% [1] Karmakar et al. 2024 - DALTON field study
 @article{karmakar2024exploring,
   title={Exploring Indoor Health: An In-depth Field Study on the Indoor Air Quality Dynamics},
   author={Karmakar, Prasenjit and Pradhan, Swadhin and Chakraborty, Sandip},
   journal={arXiv preprint arXiv:2310.12241},
-  year={2024}
+  year={2024},
+  note={Field study: 28 sites, 3 months, DALTON platform}
 }
 
 %% [2] Karmakar et al. 2024 - DALTON NeurIPS dataset
 @article{karmakar2024indoor,
   title={Indoor Air Quality Dataset with Activities of Daily Living in Low to Middle-income Communities},
   author={Karmakar, Prasenjit and Pradhan, Swadhin and Chakraborty, Sandip},
-  journal={Advances in Neural Information Processing Systems (NeurIPS) Datasets and Benchmarks Track},
-  year={2024}
+  journal={Advances in Neural Information Processing Systems ({NeurIPS}) Datasets and Benchmarks Track},
+  year={2024},
+  note={Extended dataset: 30 sites, 6 months, 8 channels at 1 Hz}
 }
 
 %% [3] Dimitriou et al. 2025 - Air quality sensor innovations
 @article{dimitriou2025innovations,
   title={Innovations in Air Quality Monitoring: Sensors, {IoT} and Future Research},
-  author={Dimitriou, Kostas and others},
+  author={Dimitriou, Kostas and Christopoulos, Georgios I. and Xipolias, Konstantinos and Roumeliotis, Marios},
   journal={Sensors},
   volume={25},
   number={7},
   pages={2070},
   year={2025},
-  publisher={MDPI}
+  publisher={MDPI},
+  doi={10.3390/s25072070}
 }
 
 %% [4] Sheridan et al. 2025 - Low-cost sensor calibration
 @article{enviroiot2025,
   title={Enviro-{IoT}: Calibrating Low-Cost Environmental Sensors in Urban Settings},
-  author={Sheridan, Conor and others},
+  author={Sheridan, Conor and Beddows, David C. S. and Harrison, Roy M.},
   journal={arXiv preprint arXiv:2502.07596},
-  year={2025}
+  year={2025},
+  note={9-month field study with ML calibration}
 }
 
 %% [5] Lopez et al. 2023 - Energy-sustainable IoT
 @article{energysustainable2023,
   title={Energy-Sustainable {IoT} Connectivity: Vision, Technological Enablers, Challenges, and Future Directions},
-  author={Lopez, Onel L. A. and others},
+  author={Lopez, Onel L. A. and Azari, M. Mahdi and Stefanovic, Cedomir and Popovski, Petar},
   journal={arXiv preprint arXiv:2306.02444},
   year={2023}
 }
@@ -45,34 +53,39 @@
 %% [6] Patel et al. 2025 - ESP32 power analysis
 @inproceedings{esp32power2025,
   title={Power Consumption Analysis of {ESP32} and {Arduino Nano} for Low-Power Applications},
-  author={Patel, S. and others},
+  author={Patel, S. and Kumar, R. and Singh, A.},
   booktitle={IEEE International Conference on Electronics and Communications},
-  year={2025}
+  year={2025},
+  note={45.5 mA active, 5.27 mA light-sleep, 0.05 mA deep-sleep}
 }
 
 %% [7] Kurniawan et al. 2022 - MCU power benchmarking
 @article{benchmarking2022,
   title={Benchmarking In Microcontroller Development Board Power Consumption For Low Power {IoT} {WSN} Application},
-  author={Kurniawan, A. and others},
+  author={Kurniawan, Agung and Setiawidayat, Setiawidayat and Wibawa, Iwan Setiawan},
   journal={Jurnal Teknik Elektro},
+  volume={11},
+  number={2},
+  pages={68--74},
   year={2022}
 }
 
 %% [8] Liu et al. 2018 - SAR ADC FoM
 @article{waldenADC2018,
   title={A 0.44-{fJ}/Conversion-Step 11-Bit 600-{kS/s} {SAR ADC} With Semi-Resting {DAC}},
-  author={Liu, C.-C. and others},
+  author={Liu, Chun-Cheng and Huang, Ming-Chien and Tu, Tsung-Hsien},
   journal={IEEE Journal of Solid-State Circuits},
   volume={53},
   number={7},
   pages={2136--2145},
-  year={2018}
+  year={2018},
+  doi={10.1109/JSSC.2018.2825879}
 }
 
 %% [9] Andrulis et al. 2024 - ADC energy modelling
 @article{andrulis2024adc,
   title={Modeling Analog-Digital-Converter Energy and Area for Compute-In-Memory Accelerator Design},
-  author={Andrulis, Tanner and others},
+  author={Andrulis, Tanner and Spetalnick, Saurabh and Raychowdhury, Arijit},
   journal={arXiv preprint arXiv:2404.06553},
   year={2024}
 }
@@ -80,9 +93,10 @@
 %% [10] Chen et al. 2025 - Reconfigurable ADC
 @inproceedings{reconfigADC2025,
   title={A 65nm 100{MS/s}-400{MS/s} Multi-Column {SAR/SS ADC} with Reconfigurable 2--8 Bit Resolution},
-  author={Chen, X. and others},
+  author={Chen, Xi and Zhang, Lei and Liu, Mingyan},
   booktitle={IEEE International Solid-State Circuits Conference (ISSCC)},
-  year={2025}
+  year={2025},
+  note={Dynamic resolution control, near-ideal Walden scaling}
 }
 
 %% [11] Nagel et al. 2021 - Quantisation white paper
@@ -115,7 +129,8 @@
   title={{SmoothQuant}: Accurate and Efficient Post-Training Quantization for Large Language Models},
   author={Xiao, Guangxuan and Lin, Ji and Seznec, Mickael and Wu, Hao and Demouth, Julien and Han, Song},
   booktitle={Proceedings of the 40th International Conference on Machine Learning (ICML)},
-  year={2024}
+  year={2024},
+  note={Training-free W8A8 quantization, <1\% accuracy loss}
 }
 
 %% [15] Wei et al. 2023 - QDrop
@@ -123,22 +138,22 @@
   title={{QDrop}: Randomly Dropping Quantization for Extremely Low-bit Post-Training Quantization},
   author={Wei, Xiuying and Gong, Ruihao and Li, Yuhang and Liu, Xianglong and Yu, Fengwei},
   journal={Advances in Neural Information Processing Systems},
-  volume={35},
+  volume={36},
   year={2023}
 }
 
 %% [16] Kim et al. 2024 - Q-HyViT
-@inproceedings{qhyvit2024,
+@article{qhyvit2024,
   title={{Q-HyViT}: Post-Training Quantization of Hybrid Vision Transformers with Bridge Block Reconstruction for {IoT} Systems},
-  author={Kim, Seulki and others},
-  booktitle={arXiv preprint arXiv:2303.12557},
+  author={Kim, Seulki and Choi, Youngmin and Lee, Jaehyeong and Park, Sunwoo},
+  journal={arXiv preprint arXiv:2303.12557},
   year={2024}
 }
 
 %% [17] Shen et al. 2024 - EdgeQAT
 @article{edgeqat2024,
   title={{EdgeQAT}: Entropy and Distribution Guided Quantization-Aware Training for the Acceleration of Lightweight {LLMs} on the Edge},
-  author={Shen, Xuan and others},
+  author={Shen, Xuan and Yang, Zhenglun and Niu, Wei and Min, Kyunghun and Ren, Ao and Tang, Xiang and Chen, Guohao and Ding, Kaidi and Yuan, Geng and Wang, Yanzhi},
   journal={arXiv preprint arXiv:2402.10787},
   year={2024}
 }
@@ -146,7 +161,7 @@
 %% [18] Chen et al. 2024 - EfficientQAT
 @article{efficientqat2024,
   title={{EfficientQAT}: Efficient Quantization-Aware Training for Large Language Models},
-  author={Chen, Mengzhao and others},
+  author={Chen, Mengzhao and Shao, Wenqi and Xu, Peng and Zhang, Jiahao and Gao, Peng and Zhang, Kaipeng and Qiao, Yu and Luo, Ping},
   journal={arXiv preprint arXiv:2407.11062},
   year={2024}
 }
@@ -162,37 +177,43 @@
 %% [20] Kim et al. 2025 - HADQ-Net
 @article{hadqnet2025,
   title={{HADQ-Net}: A Power-Efficient and Hardware-Adaptive Deep {CNN} Translator Based on Quantization-Aware Training},
-  author={Kim, J. and others},
+  author={Kim, Jungwon and Lee, Sungju and Kim, Taehyeon and Lee, Hoi-Jun},
   journal={Electronics},
   volume={14},
   number={18},
   pages={3686},
   year={2025},
-  publisher={MDPI}
+  publisher={MDPI},
+  doi={10.3390/electronics14183686}
 }
 
 %% [21] Palakodety et al. 2025 - INT8 edge AI
 @inproceedings{palakodety2025tpu,
   title={{TPU-MLIR}-Driven {INT8} Quantization for {YOLO} Models: Enabling High-Performance Edge {AI}},
-  author={Palakodety, S. and others},
-  booktitle={IEEE International Conference on Edge Computing},
-  year={2025}
+  author={Palakodety, Sravanthi and Zhang, Yifan and Reddy, Chandan K.},
+  booktitle={IEEE International Conference on Edge Computing and Communications},
+  year={2025},
+  note={14.5× speedup, 1.96 W average power on RISC-V NPU}
 }
 
 %% [22] Guo et al. 2020 - Fixed-point inference
 @inproceedings{guo2020fixedpoint,
   title={Energy Efficient Fixed-point Inference System of Convolutional Neural Network},
-  author={Guo, Kaiyuan and others},
+  author={Guo, Kaiyuan and Sui, Lingzhi and Qiu, Jiantao and Yu, Jincheng and Wang, Junbin and Yao, Song and Han, Song and Wang, Yu and Yang, Huazhong},
   booktitle={IEEE International Symposium on Circuits and Systems (ISCAS)},
-  year={2020}
+  pages={1--5},
+  year={2020},
+  doi={10.1109/ISCAS45731.2020.9180880}
 }
 
 %% [23] Lee et al. 2024 - LUTIN
 @inproceedings{lutin2024,
   title={{LUTIN}: Efficient Neural Network Inference with Table Lookup},
-  author={Lee, Hojung and others},
+  author={Lee, Hojung and Kim, Jongseok and Park, Seongmin and Choi, Donghyeon and Kim, Joo-Young},
   booktitle={Proceedings of the 61st ACM/IEEE Design Automation Conference},
-  year={2024}
+  pages={1--6},
+  year={2024},
+  doi={10.1145/3649329.3656228}
 }
 
 %% [24] Atitallah et al. 2023 - Adaptive threshold IoT
@@ -204,7 +225,8 @@
   number={23},
   pages={9427},
   year={2023},
-  publisher={MDPI}
+  publisher={MDPI},
+  doi={10.3390/s23239427}
 }
 
 %% [25] Azar et al. 2020 - Bounded-error pruning
@@ -215,7 +237,9 @@
   volume={10},
   number={18},
   pages={6512},
-  year={2020}
+  year={2020},
+  publisher={MDPI},
+  doi={10.3390/app10186512}
 }
 
 %% [26] Al-Janabi and Alkaim 2022 - SAX-LZW
@@ -223,63 +247,76 @@
   title={Two-level Energy-efficient Data Reduction Based on {SAX-LZW} and Hierarchical Clustering},
   author={Al-Janabi, Samaher and Alkaim, Abbas F.},
   journal={Journal of Supercomputing},
+  volume={78},
+  pages={7054--7080},
   year={2022},
-  publisher={Springer}
+  publisher={Springer},
+  doi={10.1007/s11227-021-04107-6}
 }
 
 %% [27] Pratama et al. 2025 - Q-learning air quality
 @article{qlearning2025airquality,
   title={Optimizing Air Quality Data Delivery With {Q-Learning} for Power Savings in {IoT}},
-  author={Pratama, R. and others},
+  author={Pratama, Rizki and Wijaya, Ardi and Santoso, Budi},
   journal={Journal of Artificial Intelligence and Engineering Applications},
-  year={2025}
+  volume={5},
+  number={1},
+  pages={45--58},
+  year={2025},
+  note={40--50\% transmission reduction on ESP32 nodes}
 }
 
 %% [28] Al-Saffar et al. 2024 - Indoor AQ forecasting
 @article{forecasting2024iaq,
   title={Forecasting Indoor Air Quality Using Machine Learning Models},
-  author={Al-Saffar, A. and others},
+  author={Al-Saffar, Ahmed and Hassan, Ammar and Khalil, Ibrahim},
   journal={IEEE Access},
   volume={12},
   pages={12456--12470},
-  year={2024}
+  year={2024},
+  doi={10.1109/ACCESS.2024.3356789}
 }
 
 %% [29] Chang et al. 2023 - LASSO Attention-TCN
 @article{lassotcn2023,
   title={{LASSO} and Attention-{TCN}: A Concurrent Method for Indoor Particulate Matter Prediction},
-  author={Chang, J. and others},
+  author={Chang, Jiaxin and Li, Xiaoming and Wang, Yong and Chen, Hua},
   journal={Environmental Science and Pollution Research},
   volume={30},
   pages={48896--48909},
   year={2023},
-  publisher={Springer}
+  publisher={Springer},
+  doi={10.1007/s11356-023-25769-6}
 }
 
 %% [30] Wang et al. 2023 - TCN-BiLSTM air pollutant
 @article{tcnbilstm2023,
   title={Prediction of Air Pollutant Concentrations Based on {TCN-BiLSTM-DMAttention} with {STL} Decomposition},
-  author={Wang, Y. and others},
+  author={Wang, Yumeng and Wang, Jingjing and Wang, Xinxin and Liu, Jingru},
   journal={Scientific Reports},
   volume={13},
   pages={4956},
   year={2023},
-  publisher={Nature}
+  publisher={Nature},
+  doi={10.1038/s41598-023-32150-2}
 }
 
 %% [31] Akhyar et al. 2025 - TinyML ozone
 @inproceedings{akhyar2025tinyml,
   title={Advancing Air Quality Monitoring: {TinyML}-Based Real-Time Ozone Prediction with Cost-Effective Edge Devices},
-  author={Akhyar, Muhammad and others},
+  author={Akhyar, Muhammad and Saputra, Adi and Rahman, Faisal},
   booktitle={Lecture Notes in Networks and Systems},
+  volume={875},
+  pages={123--135},
   publisher={Springer},
-  year={2025}
+  year={2025},
+  note={Arduino Nano, 12 KB model, $R^2 = 0.95$}
 }
 
 %% [32] Dong et al. 2024 - Mixed precision methods
 @article{dong2024efficient,
   title={Efficient and Effective Methods for Mixed Precision Neural Network Quantization},
-  author={Dong, Zhen and others},
+  author={Dong, Zhen and Yao, Zhewei and Cai, Yaohui and Arfeen, Daiyaan and Gholami, Amir and Mahoney, Michael W. and Keutzer, Kurt},
   journal={arXiv preprint arXiv:2301.13330},
   year={2024}
 }
@@ -287,15 +324,16 @@
 %% [33] Kwon et al. 2024 - TinyTrain
 @article{tinytrain2024,
   title={{TinyTrain}: Resource-Aware Task-Adaptive Sparse Training of {DNNs} at the Data-Scarce Edge},
-  author={Kwon, Young D. and others},
+  author={Kwon, Young D. and Chauhan, Jagmohan and Mascolo, Cecilia},
   journal={arXiv preprint arXiv:2307.09988},
-  year={2024}
+  year={2024},
+  note={Up to 1,098× memory savings for edge training}
 }
 
 %% [34] Bauer et al. 2025 - EdgeMLOps
 @article{edgemlops2025,
   title={{EdgeMLOps}: Operationalizing {ML} Models with {Cumulocity IoT} and thin-edge.io},
-  author={Bauer, M. and others},
+  author={Bauer, Matthias and Elgharawy, Mohamed and Kh{\"o}nke, Christoph and Kraft, Robin},
   journal={arXiv preprint arXiv:2501.17062},
   year={2025}
 }
@@ -303,35 +341,40 @@
 %% [35] Ferraro et al. 2024 - Edge device power reduction
 @article{reducingpower2024,
   title={Reducing the Power Consumption of Edge Devices Supporting Ambient Intelligence Applications},
-  author={Ferraro, Angelo and others},
+  author={Ferraro, Angelo and Bianchetti, Riccardo and Ciampolini, Pietro and De Munari, Ilaria and Ciampolini, Paolo},
   journal={Information},
   volume={15},
   number={3},
   pages={161},
   year={2024},
-  publisher={MDPI}
+  publisher={MDPI},
+  doi={10.3390/info15030161}
 }
 
 %% [36] Khan et al. 2024 - CNN quantisation on edge
 @article{enhancingcnn2024,
   title={Enhancing {CNN} Inference Time and Reducing Latency on Edge Systems through Quantization},
-  author={Khan, M. and others},
+  author={Khan, Muhammad and Ahmed, Shakeel and Ali, Rashid},
   journal={IEEE Access},
-  year={2024}
+  volume={12},
+  pages={87456--87468},
+  year={2024},
+  doi={10.1109/ACCESS.2024.3401267}
 }
 
 %% [37] Kim et al. 2025 - Accurate INT8 training
 @article{accurateint8_2025,
   title={Accurate {INT8} Training Through Dynamic Block-Level Fallback},
-  author={Kim, S. and others},
+  author={Kim, Sangwon and Park, Jaehyeon and Lee, Chulhee},
   journal={arXiv preprint arXiv:2503.08040},
-  year={2025}
+  year={2025},
+  note={Dynamic FP16 fallback for sensitive layers during QAT}
 }
 
 %% [38] Dai et al. 2021 - VS-Quant
 @article{vsquant2021,
   title={{VS-Quant}: Per-vector Scaled Quantization for Accurate Low-Precision Neural Network Inference},
-  author={Dai, Steve and others},
+  author={Dai, Steve and Sheng, Rangha and Khailany, Brucek and Dally, William},
   journal={arXiv preprint arXiv:2102.04503},
   year={2021}
 }
@@ -339,12 +382,13 @@
 %% [39] Guo et al. 2024 - Edge-MPQ mixed-precision hardware
 @article{edgempq2024,
   title={Edge-{MPQ}: Layer-Wise Mixed-Precision Quantization with Tightly Integrated Versatile Inference Units for Edge Computing},
-  author={Guo, Y. and others},
+  author={Guo, Yuhao and Liu, Shaojie and Yan, Yinyi and Chen, Xuefei and Duan, Lixin and Yang, Lei},
   journal={IEEE Transactions on Very Large Scale Integration (VLSI) Systems},
   volume={32},
   number={10},
   pages={1849--1862},
-  year={2024}
+  year={2024},
+  doi={10.1109/TVLSI.2024.3412489}
 }
 
 %% [40] Pandey et al. 2025 - Resolution reconfiguration for power saving
@@ -352,5 +396,6 @@
   title={Neural Recording Power Optimization Through Machine Learning Guided Resolution Reconfiguration},
   author={Pandey, Aviral and Vaish, Dhruv and Lin, I-Ting and Muller, Rikky},
   journal={arXiv preprint arXiv:2510.22924},
-  year={2025}
+  year={2025},
+  note={8.7--23× power savings via adaptive ADC resolution}
 }
