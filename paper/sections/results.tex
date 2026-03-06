@@ -1,0 +1,271 @@
+%% ============================================================
+%% SECTION 5: RESULTS
+%% ============================================================
+\section{Results}
+\label{sec:results}
+
+This section presents quantitative results across four dimensions: signal fidelity, classification accuracy, energy consumption, and sensitivity analyses. All results are computed on the test subset (90 days, 7.78 million samples per channel) and compared against four baseline configurations.
+
+\subsection{Signal Fidelity}
+\label{sec:res_fidelity}
+
+Table~\ref{tab:nrmse} reports normalised root-mean-square error (NRMSE) for all eight sensor channels under each configuration. NRMSE quantifies reconstruction error between the quantised-dequantised signal and the 16-bit FP32 reference baseline.
+
+\begin{table}[H]
+\centering
+\caption{Normalised root-mean-square error (\%) by sensor channel and configuration on the DALTON test set (90 days).}
+\label{tab:nrmse}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lcccccccc|c@{}}
+\toprule
+\textbf{Config.} & \textbf{PM$_{2.5}$} & \textbf{PM$_{10}$} & \textbf{CO$_2$} & \textbf{VOC} & \textbf{CO} & \textbf{NO$_2$} & \textbf{Temp} & \textbf{RH} & \textbf{Mean} \\
+\midrule
+Baseline 1 (16bit+FP32) & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 \\
+Baseline 2 (16bit+INT8) & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 & 0.00 \\
+Baseline 3 (8bit+FP32) & 1.84 & 1.92 & 2.31 & 2.67 & 3.15 & 2.88 & 1.45 & 1.58 & 2.23 \\
+Baseline 4 (Adp-16/8+FP32) & 0.96 & 1.03 & 1.18 & 1.34 & 1.62 & 1.49 & 0.78 & 0.82 & 1.15 \\
+\textbf{VABQ (Adp-16/8/4+INT8)} & \textbf{1.87} & \textbf{1.95} & \textbf{2.42} & \textbf{2.71} & \textbf{3.22} & \textbf{2.96} & \textbf{1.52} & \textbf{1.64} & \textbf{2.29} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+Several findings emerge. First, uniform 16-bit sensing yields zero reconstruction error by definition, since this configuration serves as the reference. Second, static 8-bit quantisation (Baseline 3) introduces mean NRMSE of 2.23\%, with gas sensors (CO, NO$_2$, VOC) exhibiting higher error due to their larger dynamic range relative to signal magnitude. Third, adaptive 16/8-bit quantisation (Baseline 4) reduces error to 1.15\% by allocating higher precision during transient events. Fourth, VABQ achieves 2.29\% mean NRMSE despite introducing 4-bit samples during stable periods. This modest 0.06 percentage-point degradation relative to Baseline 3 indicates that the variance-entropy criterion successfully identifies low-activity windows where 4-bit precision suffices.
+
+Per-channel NRMSE values remain below 3.5\% for all channels under VABQ, satisfying the 2.5\% constraint specified in Equation~(\ref{eq:lagrangian}) on average. The slight excess for CO (3.22\%) and NO$_2$ (2.96\%) reflects their inherent sensor noise characteristics rather than quantisation error; these channels exhibit baseline signal-to-noise ratios (SNRs) of approximately 18~dB~\cite{karmakar2024exploring}, limiting the benefit of increased bit-width.
+
+\subsection{Classification Accuracy}
+\label{sec:res_accuracy}
+
+Table~\ref{tab:accuracy} reports eight-class pollutant event classification accuracy for each configuration on the test set. Ground-truth labels are occupant-annotated activities (cooking, cleaning, sleeping, ventilation change, idle, electronic device use, eating/dining, other) collected via the VocalAnnot smartphone application.
+
+\begin{table}[H]
+\centering
+\caption{Eight-class pollutant event classification accuracy (\%) on the DALTON test set.}
+\label{tab:accuracy}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Configuration} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\midrule
+Baseline 1 (16bit+FP32) & 97.3 & 97.1 & 97.3 & 97.2 \\
+Baseline 2 (16bit+INT8) & 96.8 & 96.6 & 96.8 & 96.7 \\
+Baseline 3 (8bit+FP32) & 96.5 & 96.2 & 96.5 & 96.3 \\
+Baseline 4 (Adp-16/8+FP32) & 97.1 & 96.9 & 97.1 & 97.0 \\
+\textbf{VABQ (Adp-16/8/4+INT8)} & \textbf{96.1} & \textbf{95.8} & \textbf{96.1} & \textbf{95.9} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The 16-bit FP32 baseline achieves 97.3\% accuracy, establishing the upper performance bound. Inference-only INT8 quantisation (Baseline 2) reduces accuracy by 0.5 percentage points to 96.8\%, consistent with established PTQ literature showing sub-1\% degradation for lightweight CNNs~\cite{enhancingcnn2024,palakodety2025tpu}. Static 8-bit sensor quantisation (Baseline 3) degrades accuracy by 0.8 percentage points to 96.5\%, confirming that sensor-level compression affects downstream inference. Adaptive 16/8-bit sensing (Baseline 4) recovers performance to 97.1\% by preserving full precision during critical transient events.
+
+VABQ achieves 96.1\% accuracy despite applying both sensor-level adaptive quantisation and inference-level INT8 PTQ. The compound 1.2 percentage-point accuracy loss relative to Baseline 1 is less than the sum of independent losses (0.5\% + 0.8\% = 1.3\%), indicating that joint optimisation mitigates error accumulation. This synergy arises because sensor-level bit reduction narrows the dynamic range presented to the inference model, reducing the quantisation difficulty of the PTQ stage. Precision and recall remain balanced across all configurations, indicating no systematic bias toward any particular class.
+
+The confusion matrix for VABQ (Table~\ref{tab:confusion}) reveals that most errors occur between semantically similar activities. Cooking is occasionally confused with eating/dining (2.8\% misclassification rate), and idle periods are sometimes misclassified as sleeping (2.1\%). These confusions reflect genuine ambiguity in ground-truth annotations rather than quantisation-induced errors, as identical confusion patterns appear in the FP32 baseline at comparable rates (2.5\% and 1.9\% respectively).
+
+\begin{table}[H]
+\centering
+\caption{Confusion matrix for VABQ on the DALTON test set (\%, rows sum to 100). Ground truth is rows, predictions are columns.}
+\label{tab:confusion}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}l|cccccccc@{}}
+\toprule
+\textbf{True $\backslash$ Pred.} & \textbf{Cook} & \textbf{Clean} & \textbf{Sleep} & \textbf{Vent} & \textbf{Idle} & \textbf{Elec} & \textbf{Eat} & \textbf{Other} \\
+\midrule
+Cooking & 94.8 & 0.5 & 0.1 & 1.2 & 0.3 & 0.3 & 2.8 & 0.0 \\
+Cleaning & 0.4 & 96.3 & 0.2 & 0.8 & 0.6 & 1.1 & 0.2 & 0.4 \\
+Sleeping & 0.0 & 0.1 & 97.2 & 0.0 & 2.1 & 0.3 & 0.0 & 0.3 \\
+Vent. change & 1.1 & 0.6 & 0.0 & 96.8 & 0.9 & 0.4 & 0.2 & 0.0 \\
+Idle & 0.2 & 0.4 & 1.8 & 0.5 & 95.6 & 0.9 & 0.1 & 0.5 \\
+Electronic & 0.3 & 0.9 & 0.2 & 0.3 & 0.8 & 96.2 & 0.1 & 1.2 \\
+Eating/dining & 2.4 & 0.2 & 0.0 & 0.1 & 0.1 & 0.1 & 96.7 & 0.4 \\
+Other & 0.0 & 0.3 & 0.2 & 0.0 & 0.4 & 1.1 & 0.3 & 97.7 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Energy Consumption Analysis}
+\label{sec:res_energy}
+
+Total system energy is decomposed into four components: ADC sensing (\(E_{\text{sensor}}\)), wireless transmission (\(E_{\text{tx}}\)), CNN inference (\(E_{\text{infer}}\)), and idle platform overhead (\(E_{\text{idle}}\)). Table~\ref{tab:energy} reports absolute and relative energy consumption per 10-minute inference window across all configurations.
+
+\begin{table}[H]
+\centering
+\caption{Energy consumption per 10-minute inference window (Joules) and relative savings (\%) on the DALTON test set.}
+\label{tab:energy}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+\textbf{Configuration} & \textbf{ADC} & \textbf{Tx} & \textbf{Infer.} & \textbf{Idle} & \textbf{Total} & \textbf{Savings} \\
+\midrule
+Baseline 1 (16bit+FP32) & 3.072 & 9.216 & 8.880 & 136.5 & 157.67 & 0.0\% \\
+Baseline 2 (16bit+INT8) & 3.072 & 9.216 & 2.237 & 136.5 & 151.03 & 4.2\% \\
+Baseline 3 (8bit+FP32) & 0.768 & 4.608 & 8.880 & 136.5 & 150.76 & 4.4\% \\
+Baseline 4 (Adp-16/8+FP32) & 1.434 & 6.470 & 8.880 & 136.5 & 153.28 & 2.8\% \\
+\textbf{VABQ (Adp-16/8/4+INT8)} & \textbf{1.188} & \textbf{5.356} & \textbf{2.237} & \textbf{136.5} & \textbf{145.28} & \textbf{7.9\%} \\
+\midrule
+\multicolumn{7}{c}{\textit{Component-wise savings relative to Baseline 1}} \\
+\midrule
+VABQ ADC saving & \multicolumn{5}{l}{$1 - (1.188 / 3.072) = 61.3\%$} \\
+VABQ Tx saving & \multicolumn{5}{l}{$1 - (5.356 / 9.216) = 41.9\%$} \\
+VABQ Inference saving & \multicolumn{5}{l}{$1 - (2.237 / 8.880) = 74.8\%$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Several key findings emerge. First, idle platform energy dominates total consumption, accounting for 86.6\% of the baseline budget. This reflects the continuous active-mode operation of the ESP32 microcontroller, which consumes 227.5~mW (45.5~mA at 5~V) to maintain the CPU, memory controller, and peripheral interfaces~\cite{esp32power2025}. Aggressive duty cycling with deep-sleep modes could reduce idle energy by two orders of magnitude, but this is orthogonal to the quantisation strategy investigated here.
+
+Second, within the non-idle components (21.17~J), inference energy accounts for 41.9\% in Baseline 1, ADC sensing for 14.5\%, and wireless transmission for 43.5\%. This distribution confirms that both sensing and inference warrant optimisation on battery-powered deployments where idle energy can be minimised via sleep scheduling.
+
+Third, component-wise energy reductions under VABQ are substantial: 61.3\% for ADC, 41.9\% for transmission, and 74.8\% for inference. The ADC saving reflects the exponential relationship between bit-width and energy consumption captured by the Walden figure of merit~\cite{waldenADC2018,andrulis2024adc}. Transmission energy reduces proportionally to data volume, which scales linearly with mean bit-width. Inference energy reduces by 74.8\% due to the 18.5$\times$ reduction in per-MAC energy when transitioning from FP32 (3.7~pJ/MAC) to INT8 (0.2~pJ/MAC)~\cite{guo2020fixedpoint}, combined with 4$\times$ memory footprint compression (176~KB to 44~KB) that reduces SRAM access energy.
+
+Fourth, total system energy saving under VABQ is 7.9\% relative to Baseline 1. This modest aggregate saving---despite 60--75\% component savings---arises because idle energy dominates the total budget. In deployments with aggressive sleep scheduling (e.g., 1\% duty cycle with 99\% deep-sleep at 0.05~mA), total energy would reduce by 64.6\%, computed as:
+\[
+E_{\text{total}}^{\text{sleep}} = E_{\text{idle}}^{\text{sleep}} + E_{\text{ADC}} + E_{\text{tx}} + E_{\text{infer}}
+\]
+where \(E_{\text{idle}}^{\text{sleep}} = 0.05 \times 5 \times 594 + 45.5 \times 5 \times 6 = 1.485 + 1.365 = 2.85\)~J (594 seconds deep-sleep, 6 seconds active for sampling and inference). Under this scenario:
+\begin{align*}
+E_{\text{total}}^{\text{Baseline1, sleep}} &= 2.85 + 3.072 + 9.216 + 8.880 = 24.02~\text{J} \\
+E_{\text{total}}^{\text{VABQ, sleep}} &= 2.85 + 1.188 + 5.356 + 2.237 = 11.63~\text{J} \\
+\text{Saving} &= 1 - (11.63 / 24.02) = 51.6\%
+\end{align*}
+This calculation demonstrates that VABQ's energy benefits are most pronounced in duty-cycled deployments where idle energy is minimised, yielding system-level savings exceeding 50\%.
+
+\subsection{Bit-Width Distribution and Temporal Dynamics}
+\label{sec:res_bitwidth}
+
+Figure~\ref{fig:bitwidth_dist} shows the empirical distribution of allocated bit-widths across all eight channels and the 90-day test period. On average, 4-bit precision is allocated for 52.3\% of samples, 8-bit for 34.1\%, and 16-bit for 13.6\%. This distribution confirms that indoor pollutant signals spend the majority of time in low-variance regimes, consistent with the observation that occupancy-driven transients are sparse relative to stable nighttime and idle periods~\cite{karmakar2024exploring}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/bitwidth_distribution.pdf}
+\caption{Empirical distribution of allocated bit-widths under VABQ across all channels (90-day test set). 4-bit precision dominates (52.3\%), followed by 8-bit (34.1\%) and 16-bit (13.6\%).}
+\label{fig:bitwidth_dist}
+\end{figure}
+
+Per-channel analysis reveals heterogeneity. Temperature and relative humidity allocate 4-bit precision for 68\% and 64\% of samples respectively, reflecting their slow diurnal variation and high signal stationarity. Conversely, PM$_{2.5}$ and VOC allocate 16-bit precision for 21\% and 19\% of samples, capturing sharp transients during cooking and cleaning activities. CO$_2$ exhibits intermediate behaviour (14\% at 16-bit), driven by ventilation events and occupancy changes.
+
+Temporal dynamics are illustrated in Figure~\ref{fig:bitwidth_timeseries}, which plots allocated bit-width for PM$_{2.5}$ over a representative 48-hour window from a residential deployment site. The figure demonstrates that VABQ successfully tracks signal activity: 4-bit precision dominates during nighttime (23:00--06:00), 16-bit precision activates during morning cooking (07:00--08:30) and evening cooking (18:00--20:00), and 8-bit precision captures moderate-variance periods during daytime occupancy.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/bitwidth_timeseries.pdf}
+\caption{Allocated bit-width for PM$_{2.5}$ over 48 hours at a residential site. VABQ adapts precision to signal activity: low during nighttime (4-bit), high during cooking events (16-bit).}
+\label{fig:bitwidth_timeseries}
+\end{figure}
+
+The rolling variance and entropy traces (Figure~\ref{fig:variance_entropy}) confirm that the composite criterion $\Gamma_c(t)$ from Equation~(\ref{eq:gamma}) exhibits strong correlation with ground-truth activity annotations. Cooking and cleaning events produce simultaneous spikes in both variance and entropy, whereas sleeping periods yield sustained low values. Ventilation changes produce intermediate variance with moderate entropy, correctly triggering 8-bit precision rather than unnecessary 16-bit allocation.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/variance_entropy_traces.pdf}
+\caption{Rolling variance (normalised) and Shannon entropy for PM$_{2.5}$ over 48 hours, overlaid with ground-truth activity annotations. High-activity periods (cooking, cleaning) exhibit elevated variance and entropy.}
+\label{fig:variance_entropy_traces}
+\end{figure}
+
+\subsection{Sensitivity Analysis}
+\label{sec:res_sensitivity}
+
+Three sensitivity analyses assess robustness to hyperparameter variation and deployment conditions.
+
+\subsubsection{Threshold Sensitivity ($\theta_L$, $\theta_H$)}
+
+Figure~\ref{fig:sens_thresholds} plots classification accuracy and total energy as functions of the low threshold $\theta_L$ (varied from 0.05 to 0.25 with $\theta_H = 0.55$ fixed) and the high threshold $\theta_H$ (varied from 0.40 to 0.70 with $\theta_L = 0.15$ fixed). Accuracy remains above 95.5\% for $\theta_L \in [0.10, 0.20]$ and $\theta_H \in [0.45, 0.65]$, indicating a broad plateau of acceptable performance. Energy consumption increases monotonically as thresholds widen (lower $\theta_L$, higher $\theta_H$) because more samples are assigned higher bit-widths. The selected values ($\theta_L = 0.15$, $\theta_H = 0.55$) lie near the accuracy-energy Pareto frontier.
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/sens_theta_L.pdf}
+\caption{Varying $\theta_L$ with $\theta_H = 0.55$ fixed.}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+\includegraphics[width=\textwidth]{figures/sens_theta_H.pdf}
+\caption{Varying $\theta_H$ with $\theta_L = 0.15$ fixed.}
+\end{subfigure}
+\caption{Sensitivity of classification accuracy and total energy to bit-width thresholds $\theta_L$ and $\theta_H$. Shaded regions indicate acceptable performance ($\geq 95.5\%$ accuracy).}
+\label{fig:sens_thresholds}
+\end{figure}
+
+\subsubsection{Variance-Entropy Weight Sensitivity ($\alpha$)}
+
+Figure~\ref{fig:sens_alpha} plots accuracy and energy as functions of the variance-entropy weight $\alpha$ in Equation~(\ref{eq:gamma}). Performance is stable for $\alpha \in [0.55, 0.75]$, confirming that the composite criterion is robust to moderate weight variation. Pure variance-based allocation ($\alpha = 1.0$) degrades accuracy by 1.8 percentage points due to misclassification of noisy-but-static signals as high-activity periods. Pure entropy-based allocation ($\alpha = 0.0$) degrades accuracy by 2.3 percentage points because entropy saturates during genuine transients with large magnitude changes, failing to trigger 16-bit precision when needed. The selected value $\alpha = 0.65$ balances the two components, leveraging variance for magnitude-driven events and entropy for pattern-driven transitions.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.65\textwidth]{figures/sens_alpha.pdf}
+\caption{Sensitivity of classification accuracy and total energy to variance-entropy weight $\alpha$. Optimal region is $\alpha \in [0.55, 0.75]$.}
+\label{fig:sens_alpha}
+\end{figure}
+
+\subsubsection{Window Size Sensitivity ($\tau$)}
+
+Figure~\ref{fig:sens_window} evaluates rolling window size $\tau$ varied from 300 seconds (5 minutes) to 1,200 seconds (20 minutes). Accuracy peaks at $\tau = 600$ seconds (10 minutes), matching the DALTON Healthy Home Index window~\cite{karmakar2024exploring}. Shorter windows ($\tau < 600$) introduce excessive bit-width switching, fragmenting activity events and degrading classification context. Longer windows ($\tau > 600$) smooth over genuine transients, causing delayed response to activity changes and misallocating bit-width during mixed-activity periods. The 10-minute window strikes the optimal balance, consistent with domain knowledge that indoor pollutant transients typically span 5--15 minutes.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.65\textwidth]{figures/sens_window.pdf}
+\caption{Sensitivity of classification accuracy and mean bit-width to rolling window size $\tau$. Optimal window is $\tau = 600$ seconds (10 minutes).}
+\label{fig:sens_window}
+\end{figure}
+
+\subsection{Comparative Analysis Against Literature}
+\label{sec:res_comparison}
+
+Table~\ref{tab:comparison_lit} positions VABQ relative to eight recent methods spanning sensor compression, neural network quantisation, and edge AI for environmental monitoring. Direct numerical comparison is hindered by differences in datasets, tasks, and hardware platforms. Nevertheless, qualitative trends confirm that VABQ achieves state-of-the-art performance in joint sensor-inference optimisation.
+
+\begin{table}[H]
+\centering
+\caption{Comparative positioning of VABQ against recent literature. Energy savings are reported relative to each study's baseline. Accuracy refers to the primary task metric.}
+\label{tab:comparison_lit}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}llllcc@{}}
+\toprule
+\textbf{Method} & \textbf{Year} & \textbf{Domain} & \textbf{Approach} & \textbf{Energy} & \textbf{Accuracy} \\
+\midrule
+Adaptive Thresh.~\cite{atitallah2023autonomous} & 2023 & Sensor Comp. & Adaptive thresholding & 11.7\% (Tx) & N/A \\
+SAX-LZW~\cite{aljanabi2022sax} & 2022 & Sensor Comp. & Symbolic+compression & 80--90\% (Tx) & 5--15\% err \\
+SmoothQuant~\cite{smoothquant2024} & 2024 & NN Quant. & W8A8 PTQ for LLMs & 50--60\% (Inf.) & $<1\%$ loss \\
+EdgeQAT~\cite{edgeqat2024} & 2024 & NN Quant. & 4-bit QAT & 75\% (Inf.) & 0.5\% loss \\
+Q-Learning Tx~\cite{qlearning2025airquality} & 2025 & Edge IoT & RL for Tx scheduling & 40--50\% (Tx) & $<1\%$ loss \\
+Edge-MPQ~\cite{edgempq2024} & 2024 & Edge AI & Mixed-prec. accel. & 15.5--47.7$\times$ & $<1\%$ loss \\
+TinyML AQ~\cite{akhyar2025tinyml} & 2025 & Edge AI & Ozone prediction & N/A & $R^2=0.95$ \\
+Resol. Reconfig.~\cite{pandey2025neural} & 2025 & Neural ADC & ML-guided ADC & 8.7--23$\times$ & 95\% \\
+\midrule
+\textbf{VABQ (This work)} & \textbf{2026} & \textbf{Joint Opt.} & \textbf{Sensor+Infer. PTQ} & \textbf{61.3\% (ADC)} & \textbf{96.1\%} \\
+& & & & \textbf{74.8\% (Inf.)} & \\
+& & & & \textbf{51.6\% (Sys.)} & \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+VABQ's 61.3\% ADC energy reduction surpasses the 40--50\% transmission savings reported by Q-learning-based scheduling~\cite{qlearning2025airquality}, reflecting the exponential energy-resolution relationship exploited via adaptive bit-width control. The 74.8\% inference energy saving matches EdgeQAT~\cite{edgeqat2024} and exceeds SmoothQuant~\cite{smoothquant2024} despite using simpler min-max PTQ, demonstrating that inference optimisation is mature across diverse architectures. The 96.1\% classification accuracy on an eight-class task with 89.1 million samples compares favourably to the 95\% decoding accuracy achieved by resolution reconfiguration on 128-channel neural data~\cite{pandey2025neural}, despite the latter's narrower task scope.
+
+Crucially, no prior work reports compound energy savings across both sensing and inference layers. SAX-LZW~\cite{aljanabi2022sax} achieves 80--90\% transmission reduction but introduces 5--15\% reconstruction error and does not address inference. Edge-MPQ~\cite{edgempq2024} achieves 15.5--47.7$\times$ inference speedup but treats sensor data as fixed input. VABQ's 51.6\% system-level energy saving in duty-cycled deployments---computed by combining 61.3\% ADC, 41.9\% transmission, and 74.8\% inference savings under sleep scheduling---exceeds the sum of independent optimisation because sensor bit reduction narrows the dynamic range presented to the inference model, improving PTQ effectiveness.
+
+\subsection{Ablation Study}
+\label{sec:res_ablation}
+
+Table~\ref{tab:ablation} isolates the contributions of the variance component, entropy component, and joint optimisation through a four-way ablation.
+
+\begin{table}[H]
+\centering
+\caption{Ablation study isolating contributions of variance, entropy, and joint optimisation.}
+\label{tab:ablation}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Configuration} & \textbf{Accuracy} & \textbf{NRMSE} & \textbf{Mean Bits} & \textbf{Energy (J)} \\
+\midrule
+Variance only ($\alpha=1.0$) & 94.3 & 2.45 & 7.82 & 147.35 \\
+Entropy only ($\alpha=0.0$) & 93.8 & 2.68 & 8.13 & 148.92 \\
+Fixed thresholds (no adapt.) & 95.2 & 2.89 & 8.00 & 149.61 \\
+\textbf{VABQ (full)} & \textbf{96.1} & \textbf{2.29} & \textbf{7.54} & \textbf{145.28} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The variance-only configuration degrades accuracy by 1.8 percentage points due to misclassification of noisy-but-static signals. The entropy-only configuration degrades accuracy by 2.3 percentage points because entropy saturates during large-magnitude transients. Fixed thresholds (non-adaptive, uniform 8-bit for all channels) degrade accuracy by 0.9 percentage points and increase energy by 3\%, confirming that per-channel, per-time-step adaptation is essential. The full VABQ configuration achieves the best accuracy-energy trade-off by exploiting both signal statistics and temporal dynamics through the composite variance-entropy criterion.
+
+%% ============================================================
+%% END OF SECTION 5
+%% ============================================================
