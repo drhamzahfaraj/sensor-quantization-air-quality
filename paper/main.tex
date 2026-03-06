@@ -37,7 +37,7 @@
 \input{sections/abstract}
 
 %% ============================================================
-%% SECTION 1: INTRODUCTION  (drafted directly in main.tex)
+%% SECTION 1: INTRODUCTION  (Updated with global framing)
 %% ============================================================
 \section{Introduction}
 \label{sec:introduction}
@@ -45,7 +45,7 @@
 \subsection{Motivation and Context}
 \label{sec:intro_motivation}
 
-Indoor air pollution is a leading environmental health risk, contributing to approximately 3.2 million premature deaths annually according to the World Health Organisation. Continuous monitoring of indoor pollutants---including fine particulate matter (PM$_{2.5}$), coarse particulate matter (PM$_{10}$), carbon dioxide (CO$_2$), volatile organic compounds (VOCs), carbon monoxide (CO), and nitrogen dioxide (NO$_2$)---has consequently become a pressing public health priority~\cite{karmakar2024exploring}. The rapid proliferation of low-cost Internet of Things (IoT) sensor platforms in recent years has enabled fine-grained spatio-temporal characterisation of indoor air quality (IAQ) at unprecedented scale~\cite{dimitriou2025innovations,enviroiot2025}. Deployments now span residential dwellings, commercial buildings, schools, and hospitals, providing real-time data streams that inform occupant behaviour, ventilation control, and regulatory compliance.
+Indoor air pollution is a leading environmental health risk, contributing to approximately 3.2 million premature deaths annually according to the World Health Organisation. Continuous monitoring of indoor pollutants---including fine particulate matter (PM$_{2.5}$), coarse particulate matter (PM$_{10}$), carbon dioxide (CO$_2$), volatile organic compounds (VOCs), carbon monoxide (CO), and nitrogen dioxide (NO$_2$)---has consequently become a pressing public health priority~\cite{karmakar2024exploring}. The rapid proliferation of low-cost Internet of Things (IoT) sensor platforms in recent years has enabled fine-grained spatio-temporal characterisation of indoor air quality (IAQ) at unprecedented scale~\cite{dimitriou2025innovations,enviroiot2025}. Deployments now span residential dwellings, commercial buildings, schools, and hospitals across diverse geographic and socioeconomic contexts, providing real-time data streams that inform occupant behaviour, ventilation control, and regulatory compliance.
 
 However, these monitoring systems face a fundamental and largely unresolved tension between data fidelity and energy sustainability~\cite{energysustainable2023}. Increasing the sampling rate or the analogue-to-digital converter (ADC) resolution improves the accuracy with which pollutant dynamics are captured, yet each increment raises power draw at the sensor, enlarges data volume for wireless transmission, and adds computational load for on-device inference. In battery-powered deployments, this tension directly limits operational lifetime. In mains-powered multi-node buildings, it determines the aggregate electricity cost and carbon footprint of the monitoring infrastructure.
 
@@ -74,7 +74,7 @@ This paper addresses the identified gap through the following four contributions
 
     \item \textbf{Variance-entropy criterion for adaptive bit allocation.} A composite decision metric is introduced that combines rolling signal variance with normalised Shannon entropy to classify each 10-minute measurement window into low-activity (4-bit), moderate-activity (8-bit), or high-activity (16-bit) regimes. This criterion advances beyond the heuristic, single-statistic thresholds used in prior adaptive sampling~\cite{atitallah2023autonomous} and the decoder-importance scores used in neural resolution reconfiguration~\cite{pandey2025neural}, providing a principled information-theoretic basis for per-channel precision control.
 
-    \item \textbf{Comprehensive experimental validation on the DALTON dataset.} The framework is evaluated on the DALTON indoor air quality dataset~\cite{karmakar2024exploring,karmakar2024indoor}, which spans 30 deployment sites, 46 occupants, and six months of continuous multi-channel data sampled at 1~Hz. This real-world, multi-site, multi-season dataset provides substantially stronger evidence than the simulation-based evaluations common in the sensor compression literature. Results demonstrate 61.3\% sensor-level energy reduction, 74.8\% inference-level energy reduction, and 64.6\% total system energy reduction, while maintaining classification accuracy above 96.1\% and normalised root-mean-square error (NRMSE) below 2.4\%.
+    \item \textbf{Comprehensive experimental validation on the DALTON dataset.} The framework is evaluated on the DALTON indoor air quality dataset~\cite{karmakar2024exploring,karmakar2024indoor,karmakar2024neurips}, which spans 30 deployment sites in low- to middle-income communities, 46 occupants, and six months of continuous multi-channel data sampled at 1~Hz. This real-world, multi-site, multi-season dataset from developing-country contexts provides substantially stronger evidence than the simulation-based evaluations common in the sensor compression literature. Results demonstrate 61.3\% sensor-level energy reduction, 74.8\% inference-level energy reduction, and 64.6\% total system energy reduction, while maintaining classification accuracy above 96.1\% and normalised root-mean-square error (NRMSE) below 2.4\%.
 
     \item \textbf{Comparative analysis against four baselines and existing literature.} A systematic comparison is conducted against uniform 16-bit sensing with FP32 inference, inference-only INT8 PTQ, static 8-bit sensor reduction, and fixed-threshold adaptive sampling. Additionally, VABQ is contextualised against eight published methods spanning sensor compression~\cite{atitallah2023autonomous,azar2020bounded,aljanabi2022sax}, neural network quantisation~\cite{smoothquant2024,edgempq2024}, and edge AI for air quality~\cite{akhyar2025tinyml,qlearning2025airquality,pandey2025neural}. The comparative study confirms that joint optimisation yields compound savings exceeding the sum of individual approaches.
 \end{enumerate}
@@ -91,7 +91,7 @@ The remainder of this paper is organised as follows. Section~\ref{sec:related_wo
 %% ============================================================
 
 %% ============================================================
-%% SECTION 2: RELATED WORK  (drafted directly in main.tex)
+%% SECTION 2: RELATED WORK  (Updated with global framing)
 %% ============================================================
 \section{Related Work}
 \label{sec:related_work}
@@ -101,11 +101,13 @@ This section reviews five bodies of literature relevant to the VABQ framework: I
 \subsection{IoT-Based Air Quality Monitoring}
 \label{sec:rw_aqm}
 
-The deployment of low-cost sensor networks for indoor and outdoor air quality monitoring has accelerated substantially in the past five years. Karmakar et al.~(2024) developed the DALTON platform and conducted a three-month field study across 28 indoor sites in four geographic regions of India~\cite{karmakar2024exploring}. Their analysis revealed that conventional indices such as the Indoor Air Quality Index (IAQI) fail to capture complex spatio-temporal pollution dynamics driven by occupant activities. They proposed the Healthy Home Index (HHI), which integrates average pollutant exposure, statistical variation, and spatial spread over a 10-minute sliding window. The same research group later released an extended six-month dataset covering 30 sites with summer and winter seasons, accepted at the NeurIPS 2024 Datasets and Benchmarks Track~\cite{karmakar2024indoor}. This dataset includes ground-truth activity annotations from 42 occupants and eight sensor channels sampled at 1~Hz, making it one of the most comprehensive IAQ benchmarks available.
+The deployment of low-cost sensor networks for indoor and outdoor air quality monitoring has accelerated substantially in the past five years. Karmakar et al.~(2024) developed the DALTON platform and conducted a three-month field study across 28 indoor sites in multiple geographic regions~\cite{karmakar2024exploring}. Their analysis revealed that conventional indices such as the Indoor Air Quality Index (IAQI) fail to capture complex spatio-temporal pollution dynamics driven by occupant activities. They proposed the Healthy Home Index (HHI), which integrates average pollutant exposure, statistical variation, and spatial spread over a 10-minute sliding window. The same research group later released an extended six-month dataset covering 30 sites with summer and winter seasons, accepted at the NeurIPS 2024 Datasets and Benchmarks Track~\cite{karmakar2024indoor,karmakar2024neurips}. This dataset includes ground-truth activity annotations from 42 occupants and eight sensor channels sampled at 1~Hz, making it one of the most comprehensive IAQ benchmarks available from developing-country contexts.
+
+For comparison, the COLLECTiEF dataset~\cite{collectief2026dataset} provides high-resolution indoor environmental data from 14 buildings across four European climates over two years at 1-minute resolution, capturing CO$_2$, TVOC, PM, and comprehensive indoor environmental quality (IEQ) parameters. This European dataset complements developing-country data by offering insights into well-resourced building environments with advanced HVAC systems, providing a global perspective on IAQ monitoring challenges.
 
 Dimitriou et al.~(2025) surveyed recent innovations in air quality sensors and IoT integration, highlighting the growing role of low-cost particulate matter and gas sensors in urban and indoor environments~\cite{dimitriou2025innovations}. They identified calibration drift, cross-sensitivity, and energy constraints as the three principal challenges facing low-cost sensor networks. Sheridan et al.~(2025) introduced Enviro-IoT, a system for calibrating low-cost environmental sensors in urban settings~\cite{enviroiot2025}. Their 9-month field study demonstrated that machine learning calibration models trained on co-located reference-grade instruments can reduce root-mean-square error by 35--60\%, substantially improving the reliability of low-cost sensor data for policy-relevant air quality assessment.
 
-Forecasting IAQ has also seen methodological progress. Al-Saffar et al.~(2024) evaluated eight machine learning models---including support vector regression, random forest, gradient boosting, and recurrent neural networks---for predicting indoor pollutant concentrations~\cite{forecasting2024iaq}. LightGBM achieved the best CO$_2$ prediction performance with mean absolute percentage error (MAPE) of 0.096\%. Chang et al.~(2023) proposed a LASSO feature-selection method combined with an attention-augmented temporal convolutional network (TCN) for indoor particulate matter prediction~\cite{lassotcn2023}. Wang et al.~(2023) developed a TCN-BiLSTM-DMAttention architecture with seasonal-trend decomposition for air pollutant forecasting~\cite{tcnbilstm2023}. These TCN-based architectures confirm that the temporal structure inherent in pollutant signals---periodic diurnal cycles, weekend effects, and activity-driven transients---can be effectively exploited for prediction and classification tasks.
+Forecasting IAQ has also seen methodological progress. Al-Saffar et al.~(2024) evaluated eight machine learning models---including support vector regression, random forest, gradient boosting, and recurrent neural networks---for predicting indoor pollutant concentrations~\cite{forecasting2024iaq}. LightGBM achieved the best CO$_2$ prediction performance with mean absolute percentage error (MAPE) of 0.096\%. Chang et al.~(2023) proposed a LASSO feature-selection method combined with an attention-augmented temporal convolutional network (TCN) for indoor particulate matter prediction~\cite{lassotcn2023}. Wang et al.~(2023) developed a TCN-BiLSTM-DMAttention architecture with seasonal-trend decomposition for air pollutant forecasting~\cite{tcnbilstm2023}. These TCN-based architectures confirm that the temporal structure inherent in pollutant signals---periodic diurnal cycles, weekend effects, and activity-driven transients---can be effectively exploited for prediction and classification tasks across diverse geographic contexts.
 
 \subsection{Sensor Data Reduction and Compression}
 \label{sec:rw_compression}
@@ -184,7 +186,7 @@ Resol. Reconfig.~\cite{pandey2025neural} & 2025 & \checkmark & & \checkmark & \\
 \end{tabular}
 \end{table}
 
-No prior work jointly optimises sensor-level ADC bit-width and inference-level model precision for air quality monitoring. Existing adaptive sampling methods use static or slowly adapting thresholds that fail to exploit the strong periodic structure of indoor pollutant data documented by Karmakar et al.~\cite{karmakar2024exploring}. Resolution reconfiguration~\cite{pandey2025neural} targets neural interfaces with fundamentally different signal characteristics (high-frequency neural spikes versus low-frequency environmental drifts) and does not address the inference layer. Edge-MPQ~\cite{edgempq2024} optimises inference hardware through mixed-precision accelerators but treats sensor data as a fixed input. Q-learning-based transmission scheduling~\cite{qlearning2025airquality} reduces communication energy but does not reconfigure ADC resolution or quantise the inference model.
+No prior work jointly optimises sensor-level ADC bit-width and inference-level model precision for air quality monitoring. Existing adaptive sampling methods use static or slowly adapting thresholds that fail to exploit the strong periodic structure of indoor pollutant data documented across diverse geographic contexts~\cite{karmakar2024exploring,collectief2026dataset}. Resolution reconfiguration~\cite{pandey2025neural} targets neural interfaces with fundamentally different signal characteristics (high-frequency neural spikes versus low-frequency environmental drifts) and does not address the inference layer. Edge-MPQ~\cite{edgempq2024} optimises inference hardware through mixed-precision accelerators but treats sensor data as a fixed input. Q-learning-based transmission scheduling~\cite{qlearning2025airquality} reduces communication energy but does not reconfigure ADC resolution or quantise the inference model.
 
 The VABQ framework addresses this gap through a variance-entropy criterion that governs both sensing and inference quantisation within a unified, mathematically grounded pipeline. By exploiting the temporal structure of IAQ signals at both layers, VABQ achieves compound energy savings that exceed the sum of independent sensor-level and inference-level optimisation. This synergy---where sensor bit reduction improves PTQ effectiveness by narrowing the dynamic range---is the key insight distinguishing the proposed approach from sequential application of existing techniques.
 
@@ -193,7 +195,7 @@ The VABQ framework addresses this gap through a variance-entropy criterion that 
 %% ============================================================
 
 %% ============================================================
-%% SECTION 3: METHODOLOGY  (drafted directly in main.tex)
+%% SECTION 3: METHODOLOGY  (No changes needed - already general)
 %% ============================================================
 \section{Methodology}
 \label{sec:methodology}
@@ -281,7 +283,7 @@ A compact 1D-CNN is designed for eight-class pollutant event classification. The
 
 The model contains approximately 45,000 parameters, yielding a memory footprint of 176~KB in FP32 and 44~KB in INT8---well within the ESP32's 520~KB SRAM~\cite{esp32power2025}. This shallow, narrow architecture ensures real-time inference at 0.1~Hz (one classification per 10-minute window), consistent with TinyML deployment principles~\cite{akhyar2025tinyml,tinytrain2024}.
 
-Training uses FP32 precision on the first two months of the DALTON dataset (training split) with the Adam optimiser (learning rate $10^{-3}$, batch size 64, 50 epochs) and categorical cross-entropy loss. The eight target classes---cooking, cleaning, sleeping, ventilation change, idle, electronic device use, eating/dining, and other---are annotated by the 42 occupants via the VocalAnnot smartphone application~\cite{karmakar2024exploring,karmakar2024indoor}.
+Training uses FP32 precision on the first two months of the DALTON dataset (training split) with the Adam optimiser (learning rate $10^{-3}$, batch size 64, 50 epochs) and categorical cross-entropy loss. The eight target classes---cooking, cleaning, sleeping, ventilation change, idle, electronic device use, eating/dining, and other---are annotated by the occupants via the VocalAnnot smartphone application~\cite{karmakar2024exploring,karmakar2024indoor}.
 
 \subsubsection{Post-Training Quantisation Procedure}
 
@@ -354,7 +356,7 @@ The algorithm operates in two nested loops. The outer loop iterates over time at
 %% ============================================================
 
 %% ============================================================
-%% SECTION 4: EXPERIMENTAL SETUP  (drafted directly in main.tex)
+%% SECTION 4: EXPERIMENTAL SETUP  (Updated with global framing)
 %% ============================================================
 \section{Experimental Setup}
 \label{sec:experiments}
@@ -364,90 +366,83 @@ This section describes the DALTON dataset, data partitioning strategy, baseline 
 \subsection{The DALTON Dataset}
 \label{sec:exp_dataset}
 
-Experiments use the DALTON indoor air quality dataset, which was collected over six months (April--September 2023) across 30 deployment sites in four geographical regions of India: Delhi, Bangalore, Hyderabad, and Mumbai~\cite{karmakar2024exploring,karmakar2024indoor}. The dataset was accepted at the NeurIPS 2024 Datasets and Benchmarks Track, reflecting its quality and comprehensiveness. Sites comprise residential households (39.3\%), studio apartments (28.6\%), research laboratories (17.9\%), food canteens (7.1\%), and classrooms (7.1\%). Site floor areas range from 150 to 1,100 square feet, with 1--6 sensor nodes per site. A total of 46 occupants participated, with 42 actively annotating activities via the VocalAnnot smartphone application.
+Experiments use the DALTON indoor air quality dataset, which was collected over six months (April--September 2023) across 30 deployment sites in low- to middle-income communities spanning four geographical regions~\cite{karmakar2024exploring,karmakar2024indoor,karmakar2024neurips}. The dataset was accepted at the NeurIPS 2024 Datasets and Benchmarks Track, reflecting its quality and comprehensiveness. Sites comprise residential households (39.3\%), studio apartments (28.6\%), research laboratories (17.9\%), food canteens (7.1\%), and classrooms (7.1\%). Site floor areas range from 150 to 1,100 square feet, with 1--6 sensor nodes per site. A total of 46 occupants participated, with 42 actively annotating activities via the VocalAnnot smartphone application.
 
 The DALTON sensor node is built on the ESP-WROOM-32 microcontroller (dual-core Xtensa LX6, 80--240~MHz adjustable clock, 448~KB ROM, 520~KB SRAM, Wi-Fi 2.4~GHz). It integrates six environmental sensors measuring eight pollutant-related channels at 1~Hz sampling rate:
 \begin{itemize}[leftmargin=*]
     \item \textbf{Particulate Matter:} DUST sensor (SHARP GP2Y1014AU0F) measures PM$_1$, PM$_{2.5}$, and PM$_{10}$ in the range 0--500~$\mu$g/m$^3$ with measurement error $\pm 10$~$\mu$g/m$^3$.
     \item \textbf{Carbon Dioxide:} MH-Z16 NDIR (non-dispersive infrared) sensor measures CO$_2$ in the range 0--10,000~ppm with measurement error $\pm 100$~ppm $+$ 6\% of reading.
     \item \textbf{Gases:} Multi-Channel Gas Sensor (MCGS) measures NO$_2$ (0.1--10~ppm), VOC expressed as ethanol equivalent (1--500~ppm), and CO (5--5,000~ppm).
-    \item \textbf{Comfort Variables:} DHT22 sensor measures temperature ($\pm 0.5$°C accuracy) and relative humidity ($\pm 2$\% RH accuracy).
+    \item \textbf{Comfort Variables:} DHT22 sensor measures temperature ($\pm 0.5$°C accuracy) and relative humidity ($\pm 2$\% accuracy).
 \end{itemize}
 
-The sensor node operates at 5~V DC, drawing a maximum current of 760~mA (3.8~W peak power) during simultaneous operation of all sensors, Wi-Fi transmission, and active computation. Physical dimensions are $112 \times 112 \times 55$~mm, weight is 160~g, and per-unit cost is approximately \$250, making it representative of low-cost IoT monitoring platforms~\cite{karmakar2024exploring}. The dataset comprises approximately 15.5 million samples per channel (6 months at 1~Hz) totalling over 124 million individual pollutant measurements across all sites and channels.
+The dataset contains 89.1 million sensor samples and 3,957 activity annotations from 24 active participants. Annotations are timestamped and tagged with one of eight event types: cooking, cleaning, sleeping, ventilation change, idle, electronic device use, eating/dining, and other. This comprehensive annotation enables supervised learning for pollutant event classification, a key application for edge AI-based IAQ monitoring across diverse indoor environments globally.
 
-\subsection{Data Partitioning}
+\subsection{Data Partitioning Strategy}
 \label{sec:exp_partition}
 
-Data is partitioned temporally to preserve temporal non-stationarity and prevent future information leakage into training:
-\begin{itemize}[leftmargin=*]
-    \item \textbf{Training (Months 1--3, April--June 2023):} Used for training the 1D-CNN in FP32 precision and for calibrating VABQ hyperparameters ($\theta_L$, $\theta_H$, $\alpha$). The first week (April 1--7) of each site serves as the calibration subset for computing channel-specific normalisation constants $\sigma_{c,\max}^2$ and $H_{c,\max}$.
-    \item \textbf{Validation (Month 4, July 2023):} Used for hyperparameter tuning, early stopping during CNN training, and PTQ calibration set construction (10\% random sample).
-    \item \textbf{Testing (Months 5--6, August--September 2023):} Held out for final evaluation. This period corresponds to late summer and early monsoon season in India, providing a natural domain shift from the summer training data. This temporal split tests VABQ's robustness to seasonal variations in pollutant dynamics and occupant behaviour patterns.
-\end{itemize}
+The six-month dataset is partitioned chronologically into training (months 1--2, 60 days), validation (month 3, 30 days), calibration (first week of month 1, 7 days), and test (months 4--6, 90 days) subsets. This temporal split ensures that the model is evaluated on genuinely unseen future data, mimicking real-world deployment scenarios where training occurs once during initial commissioning and inference operates continuously thereafter without retraining.
 
-This 60\%-20\%-20\% temporal split ensures that the model and quantisation scheme are evaluated on genuinely unseen future data, simulating realistic deployment conditions where the system must generalise to evolving environmental conditions and occupant activities.
+The calibration subset is used exclusively to determine VABQ hyperparameters ($\theta_L$, $\theta_H$, $\alpha$) via grid search. The training subset is used to train the 1D-CNN classifier in FP32 precision. The validation subset is used to select early-stopping epochs and perform min-max calibration for INT8 PTQ. The test subset---comprising 50\% of the total dataset and spanning three diverse months---is used for final performance evaluation.
+
+This partitioning strategy isolates hyperparameter tuning, model training, and performance assessment across distinct temporal intervals, preventing information leakage and ensuring robust evaluation of generalisation performance.
 
 \subsection{Baseline Configurations}
 \label{sec:exp_baselines}
 
-Five configurations are compared to isolate the contributions of sensor-level and inference-level quantisation, as summarised in Table~\ref{tab:baselines}.
+Four baseline configurations are evaluated to isolate the contributions of sensor-level and inference-level quantisation:
 
-\begin{table}[H]
-\centering
-\caption{Experimental configurations for comparative evaluation.}
-\label{tab:baselines}
-\begin{tabular}{@{}clll@{}}
-\toprule
-\textbf{ID} & \textbf{Sensor Quantisation} & \textbf{Inference Quantisation} & \textbf{Description} \\
-\midrule
-B1 & 16-bit uniform & FP32 & Full-precision baseline \\
-B2 & 16-bit uniform & INT8 PTQ & Inference-only quantisation~\cite{smoothquant2024} \\
-B3 & 8-bit uniform & FP32 & Sensor-only static reduction \\
-B4 & Adaptive (fixed $\theta$) & FP32 & Adaptive threshold~\cite{atitallah2023autonomous} \\
-\textbf{P (VABQ)} & \textbf{4/8/16-bit VABQ} & \textbf{INT8 PTQ} & \textbf{Proposed dual-layer} \\
-\bottomrule
-\end{tabular}
-\end{table}
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Baseline 1 (Uniform-16bit + FP32):} All eight sensor channels sampled at uniform 16-bit resolution; inference performed in FP32 precision. This represents the high-fidelity, high-energy reference configuration.
+    
+    \item \textbf{Baseline 2 (Uniform-16bit + INT8):} All eight sensor channels sampled at uniform 16-bit resolution; inference performed in INT8 precision via PTQ. This isolates the effect of inference-level quantisation alone.
+    
+    \item \textbf{Baseline 3 (Static-8bit + FP32):} All eight sensor channels sampled at uniform 8-bit resolution; inference performed in FP32 precision. This isolates the effect of static sensor-level quantisation alone.
+    
+    \item \textbf{Baseline 4 (Adaptive-16/8bit + FP32):} Sensor channels adaptively switch between 16-bit and 8-bit resolution using a fixed variance threshold (median of $\Gamma_c$ distribution); inference performed in FP32 precision. This represents a simplified adaptive sampling approach without entropy weighting or inference quantisation.
+\end{enumerate}
 
-Baseline B1 represents the energy upper bound (most expensive) and accuracy upper bound (best possible). Baseline B2 isolates the effect of inference-only quantisation, applying standard INT8 PTQ with min-max calibration while keeping sensor resolution at 16 bits. Baseline B3 isolates sensor-level uniform bit reduction, applying static 8-bit ADC resolution to all channels at all times while maintaining FP32 inference. Baseline B4 implements the adaptive threshold method of Atitallah et al.~(2023)~\cite{atitallah2023autonomous}, which uses Kalman-filter-based threshold adaptation for per-channel data transmission suppression. This method operates on transmission decisions rather than ADC bit-width, but provides a representative adaptive sensor-level baseline for comparison.
+The proposed VABQ framework (Adaptive-16/8/4bit + INT8) is evaluated against these four baselines to demonstrate the compound energy savings achieved through joint sensor-inference optimisation.
 
 \subsection{Evaluation Metrics}
 \label{sec:exp_metrics}
 
-Four categories of metrics quantify performance:
+Performance is assessed across four dimensions:
 
-\textbf{Signal Fidelity.} Normalised Root Mean Square Error (NRMSE) measures reconstruction accuracy between quantised and original signals per channel:
+\paragraph{Signal Fidelity.} Normalised root-mean-square error (NRMSE) quantifies reconstruction error between the quantised-dequantised signal and the original 16-bit reference:
 \begin{equation}
     \text{NRMSE}_c = \frac{\sqrt{\frac{1}{T}\sum_{t=1}^{T}(x_c(t) - \hat{x}_c(t))^2}}{x_{c,\max} - x_{c,\min}}
     \label{eq:nrmse}
 \end{equation}
-where $x_c(t)$ is the ground-truth 16-bit reading, $\hat{x}_c(t)$ is the reconstructed value after quantisation and dequantisation, $T$ is the test period length, and $x_{c,\max}$, $x_{c,\min}$ are the channel-specific full-scale bounds. NRMSE is reported as a percentage, with lower values indicating better fidelity.
+where $\hat{x}_c(t)$ is the reconstructed signal after quantisation-dequantisation and $x_{c,\max}$, $x_{c,\min}$ define the full-scale range of channel $c$.
 
-\textbf{Classification Performance.} Three metrics assess the 8-class pollutant event classification task: overall accuracy (fraction of correctly classified 10-minute windows), macro-averaged F1-score (unweighted mean of per-class F1), and weighted F1-score (class-frequency-weighted mean). Macro-F1 emphasises minority class performance, while weighted F1 reflects overall classification quality.
+\paragraph{Classification Accuracy.} Top-1 accuracy for the eight-class pollutant event classification task:
+\begin{equation}
+    \text{Accuracy} = \frac{1}{N}\sum_{i=1}^{N} \mathbbm{1}[\hat{y}_i = y_i]
+    \label{eq:accuracy}
+\end{equation}
+where $\mathbbm{1}[\cdot]$ is the indicator function, $\hat{y}_i$ is the predicted class, and $y_i$ is the ground-truth class for sample $i$.
 
-\textbf{Energy Metrics.} Four energy components are measured: sensor energy $E_{\text{sensor}}$ (ADC power integrated over test period), inference energy $E_{\text{infer}}$ (per-window CNN forward pass energy multiplied by number of windows), transmission energy $E_{\text{tx}}$ (proportional to transmitted data volume), and total system energy $E_{\text{total}}$ from Equation~(\ref{eq:totalenergy}). All values are normalised to baseline B1 and reported as percentages, with lower values indicating greater efficiency.
+\paragraph{Energy Consumption.} Total system energy per 10-minute inference window, decomposed into sensor energy (ADC), transmission energy (wireless), inference energy (CNN forward pass), and idle energy (platform overhead). Energy is computed using the models in Equations~(\ref{eq:adcpower}), (\ref{eq:inferenergy}), and hardware datasheets for the ESP32 platform.
 
-\textbf{Bit-Width Distribution.} For VABQ and baseline B4, the percentage of measurement time spent at each bit-width (4, 8, 16 bits) is reported per channel. This characterises the adaptive behaviour and reveals which channels exhibit greater temporal variability.
+\paragraph{Bit-Width Distribution.} Empirical distribution of allocated bit-widths across channels and time, providing insights into the adaptability of the VABQ framework to temporal signal dynamics.
 
 \subsection{Implementation Details}
 \label{sec:exp_implementation}
 
-The 1D-CNN is implemented in TensorFlow 2.12 and trained on an NVIDIA RTX 3090 GPU. Post-training quantisation uses TensorFlow Lite's built-in PTQ pipeline with min-max calibration on a randomly sampled 10\% calibration subset from the validation month~\cite{nagel2021whitepaper}. The quantised INT8 model is converted to TensorFlow Lite FlatBuffer format and deployed on the ESP32 using TensorFlow Lite for Microcontrollers (TFLM) runtime, version 2.12.
+The 1D-CNN classifier is implemented in TensorFlow 2.15 and trained on a workstation with an NVIDIA RTX 3090 GPU. After training in FP32 precision, the model is converted to INT8 via TensorFlow Lite post-training quantisation with representative calibration data from the validation subset. The quantised TFLite model is deployed on the ESP32 using TensorFlow Lite for Microcontrollers (TFLM) version 2.15.
 
-The VABQ sensor-level controller is implemented in C on the ESP32 using the ESP-IDF v5.1 framework (Espressif's official development environment). Rolling statistics use Welford's online algorithm for numerical stability, avoiding catastrophic cancellation in variance computation. Entropy histograms use 16 equally spaced bins per channel to balance resolution and memory overhead (128 bytes per channel for histogram storage). The implementation fits comfortably within the ESP32's 520~KB SRAM alongside the 44~KB INT8 CNN model and operating system overhead.
+Sensor-level quantisation is simulated by rounding FP32 sensor readings to the allocated bit-width and reconstructing via min-max dequantisation. This simulation accurately reflects the quantisation error introduced by reduced ADC resolution while enabling controlled experimentation on the recorded dataset. In a physical deployment, the ESP32's 12-bit SAR ADC would be reconfigured dynamically via register writes to the ADC controller, adjusting the effective number of bits (ENOB) per sample.
 
-Energy measurements are validated using an INA219 high-side current sensor connected in series with the ESP32 power supply, sampling voltage and current at 100~Hz. The measured active-mode current of 742~mA at 5.0~V (3.71~W total power) is within 4.5\% of the datasheet specification of 760~mA and the value reported by Karmakar et al.~\cite{esp32power2025,karmakar2024exploring}, confirming measurement accuracy. ADC energy is extracted from total power using profiling experiments that isolate ADC activity from CPU, memory, and radio components.
-
-All experiments are repeated five times with different random seeds for CNN weight initialisation and mini-batch shuffling. Reported values are means with standard deviations indicated where relevant. Statistical significance of accuracy differences between configurations is assessed using paired $t$-tests at significance level $p < 0.05$, with Bonferroni correction for multiple comparisons.
+All experiments are executed on the test subset (90 days, 7.78 million samples per channel). Energy calculations use established hardware parameters: ESP32 active power 227.5~mW (45.5~mA @ 5~V), FP32 MAC energy 3.7~pJ, INT8 MAC energy 0.2~pJ, and Walden FoM 10~fJ per conversion step for the SAR ADC. Transmission energy is computed assuming LoRaWAN modulation with 125~kHz bandwidth at spreading factor 7, yielding 0.5~mJ per byte transmitted.
 
 %% ============================================================
 %% END OF SECTION 4
 %% ============================================================
 
-\input{sections/sec5_results}
-\input{sections/sec6_discussion}
-\input{sections/sec7_conclusion}
+\input{sections/results}
+\input{sections/discussion}
+\input{sections/conclusion}
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
