@@ -1,6 +1,6 @@
 %% references.bib
 %% Bibliography for "Optimizing Sensor Quantisation for Energy Saving in Air Quality Monitoring"
-%% 40 entries, ordered by first citation appearance in manuscript
+%% Updated with COLLECTiEF dataset and global framing
 
 %% [1] Karmakar et al. 2024 - DALTON field study
 @article{karmakar2024exploring,
@@ -8,7 +8,7 @@
   author={Karmakar, Prasenjit and Pradhan, Swadhin and Chakraborty, Sandip},
   journal={arXiv preprint arXiv:2310.12241},
   year={2024},
-  note={Field study: 28 sites, 3 months, DALTON platform}
+  note={Field study: 28 sites, 3 months, low- to middle-income communities}
 }
 
 %% [2] Karmakar et al. 2024 - DALTON NeurIPS dataset
@@ -17,7 +17,31 @@
   author={Karmakar, Prasenjit and Pradhan, Swadhin and Chakraborty, Sandip},
   journal={Advances in Neural Information Processing Systems ({NeurIPS}) Datasets and Benchmarks Track},
   year={2024},
-  note={Extended dataset: 30 sites, 6 months, 8 channels at 1 Hz}
+  note={Extended dataset: 30 sites, 6 months, 8 channels at 1 Hz, developing-country context}
+}
+
+%% [NEW] Karmakar et al. 2024 - DALTON NeurIPS proceedings
+@inproceedings{karmakar2024neurips,
+  title={Indoor Air Quality Dataset with Activities of Daily Living in Low to Middle-income Communities},
+  author={Karmakar, Prasenjit and Pradhan, Swadhin and Chakraborty, Sandip},
+  booktitle={Advances in Neural Information Processing Systems},
+  volume={37},
+  year={2024},
+  url={https://papers.nips.cc/paper_files/paper/2024/file/81e16e41f99fe4ab9c23a0e0da8eaab2-Paper-Datasets_and_Benchmarks_Track.pdf},
+  note={30 sites, 89.1M samples, 3,957 activity annotations from 24 participants}
+}
+
+%% [NEW] COLLECTiEF dataset - European indoor environmental data
+@article{collectief2026dataset,
+  title={{COLLECTiEF} dataset: A high-resolution indoor environmental dataset from European buildings across diverse climates supporting thermal, air-quality, and visual-comfort assessments},
+  author={Campodonico-Avendano, Italo Aldo and Erba, Silvia and Papadopoulos, Panayiotis and Carlucci, Salvatore and Luparelli, Antonio and Ingrosso, Amedeo and Tresoldi, Greta and Shahid, Muhammad Salman and Wurtz, Frederic and Delinchant, Benoit and others},
+  journal={Data in Brief},
+  volume={65},
+  pages={112486},
+  year={2026},
+  publisher={Elsevier},
+  doi={10.1016/j.dib.2026.112486},
+  note={14 buildings across 4 European climates, 2 years, 1-minute resolution, CO₂, TVOC, PM, IEQ}
 }
 
 %% [3] Dimitriou et al. 2025 - Air quality sensor innovations
@@ -130,7 +154,7 @@
   author={Xiao, Guangxuan and Lin, Ji and Seznec, Mickael and Wu, Hao and Demouth, Julien and Han, Song},
   booktitle={Proceedings of the 40th International Conference on Machine Learning (ICML)},
   year={2024},
-  note={Training-free W8A8 quantization, <1\% accuracy loss}
+  note={Training-free W8A8 quantization, <1\\% accuracy loss}
 }
 
 %% [15] Wei et al. 2023 - QDrop
@@ -219,7 +243,7 @@
 %% [24] Atitallah et al. 2023 - Adaptive threshold IoT
 @article{atitallah2023autonomous,
   title={Autonomous {Internet of Things} ({IoT}) Data Reduction Based on Adaptive Threshold},
-  author={Atitallah, Sana Ben and Driss, Maha and Ben Gh{\'e}zala, Henda},
+  author={Atitallah, Sana Ben and Driss, Maha and Ben Gh{\\'e}zala, Henda},
   journal={Sensors},
   volume={23},
   number={23},
@@ -263,7 +287,7 @@
   number={1},
   pages={45--58},
   year={2025},
-  note={40--50\% transmission reduction on ESP32 nodes}
+  note={40--50\\% transmission reduction on ESP32 nodes}
 }
 
 %% [28] Al-Saffar et al. 2024 - Indoor AQ forecasting
@@ -333,7 +357,7 @@
 %% [34] Bauer et al. 2025 - EdgeMLOps
 @article{edgemlops2025,
   title={{EdgeMLOps}: Operationalizing {ML} Models with {Cumulocity IoT} and thin-edge.io},
-  author={Bauer, Matthias and Elgharawy, Mohamed and Kh{\"o}nke, Christoph and Kraft, Robin},
+  author={Bauer, Matthias and Elgharawy, Mohamed and Kh{\\\"o}nke, Christoph and Kraft, Robin},
   journal={arXiv preprint arXiv:2501.17062},
   year={2025}
 }
