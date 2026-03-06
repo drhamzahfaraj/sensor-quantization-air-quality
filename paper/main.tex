@@ -353,7 +353,98 @@ The algorithm operates in two nested loops. The outer loop iterates over time at
 %% END OF SECTION 3
 %% ============================================================
 
-\input{sections/sec4_experiments}
+%% ============================================================
+%% SECTION 4: EXPERIMENTAL SETUP  (drafted directly in main.tex)
+%% ============================================================
+\section{Experimental Setup}
+\label{sec:experiments}
+
+This section describes the DALTON dataset, data partitioning strategy, baseline configurations, evaluation metrics, and implementation details that support the empirical validation of VABQ.
+
+\subsection{The DALTON Dataset}
+\label{sec:exp_dataset}
+
+Experiments use the DALTON indoor air quality dataset, which was collected over six months (April--September 2023) across 30 deployment sites in four geographical regions of India: Delhi, Bangalore, Hyderabad, and Mumbai~\cite{karmakar2024exploring,karmakar2024indoor}. The dataset was accepted at the NeurIPS 2024 Datasets and Benchmarks Track, reflecting its quality and comprehensiveness. Sites comprise residential households (39.3\%), studio apartments (28.6\%), research laboratories (17.9\%), food canteens (7.1\%), and classrooms (7.1\%). Site floor areas range from 150 to 1,100 square feet, with 1--6 sensor nodes per site. A total of 46 occupants participated, with 42 actively annotating activities via the VocalAnnot smartphone application.
+
+The DALTON sensor node is built on the ESP-WROOM-32 microcontroller (dual-core Xtensa LX6, 80--240~MHz adjustable clock, 448~KB ROM, 520~KB SRAM, Wi-Fi 2.4~GHz). It integrates six environmental sensors measuring eight pollutant-related channels at 1~Hz sampling rate:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Particulate Matter:} DUST sensor (SHARP GP2Y1014AU0F) measures PM$_1$, PM$_{2.5}$, and PM$_{10}$ in the range 0--500~$\mu$g/m$^3$ with measurement error $\pm 10$~$\mu$g/m$^3$.
+    \item \textbf{Carbon Dioxide:} MH-Z16 NDIR (non-dispersive infrared) sensor measures CO$_2$ in the range 0--10,000~ppm with measurement error $\pm 100$~ppm $+$ 6\% of reading.
+    \item \textbf{Gases:} Multi-Channel Gas Sensor (MCGS) measures NO$_2$ (0.1--10~ppm), VOC expressed as ethanol equivalent (1--500~ppm), and CO (5--5,000~ppm).
+    \item \textbf{Comfort Variables:} DHT22 sensor measures temperature ($\pm 0.5$°C accuracy) and relative humidity ($\pm 2$\% RH accuracy).
+\end{itemize}
+
+The sensor node operates at 5~V DC, drawing a maximum current of 760~mA (3.8~W peak power) during simultaneous operation of all sensors, Wi-Fi transmission, and active computation. Physical dimensions are $112 \times 112 \times 55$~mm, weight is 160~g, and per-unit cost is approximately \$250, making it representative of low-cost IoT monitoring platforms~\cite{karmakar2024exploring}. The dataset comprises approximately 15.5 million samples per channel (6 months at 1~Hz) totalling over 124 million individual pollutant measurements across all sites and channels.
+
+\subsection{Data Partitioning}
+\label{sec:exp_partition}
+
+Data is partitioned temporally to preserve temporal non-stationarity and prevent future information leakage into training:
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Training (Months 1--3, April--June 2023):} Used for training the 1D-CNN in FP32 precision and for calibrating VABQ hyperparameters ($\theta_L$, $\theta_H$, $\alpha$). The first week (April 1--7) of each site serves as the calibration subset for computing channel-specific normalisation constants $\sigma_{c,\max}^2$ and $H_{c,\max}$.
+    \item \textbf{Validation (Month 4, July 2023):} Used for hyperparameter tuning, early stopping during CNN training, and PTQ calibration set construction (10\% random sample).
+    \item \textbf{Testing (Months 5--6, August--September 2023):} Held out for final evaluation. This period corresponds to late summer and early monsoon season in India, providing a natural domain shift from the summer training data. This temporal split tests VABQ's robustness to seasonal variations in pollutant dynamics and occupant behaviour patterns.
+\end{itemize}
+
+This 60\%-20\%-20\% temporal split ensures that the model and quantisation scheme are evaluated on genuinely unseen future data, simulating realistic deployment conditions where the system must generalise to evolving environmental conditions and occupant activities.
+
+\subsection{Baseline Configurations}
+\label{sec:exp_baselines}
+
+Five configurations are compared to isolate the contributions of sensor-level and inference-level quantisation, as summarised in Table~\ref{tab:baselines}.
+
+\begin{table}[H]
+\centering
+\caption{Experimental configurations for comparative evaluation.}
+\label{tab:baselines}
+\begin{tabular}{@{}clll@{}}
+\toprule
+\textbf{ID} & \textbf{Sensor Quantisation} & \textbf{Inference Quantisation} & \textbf{Description} \\
+\midrule
+B1 & 16-bit uniform & FP32 & Full-precision baseline \\
+B2 & 16-bit uniform & INT8 PTQ & Inference-only quantisation~\cite{smoothquant2024} \\
+B3 & 8-bit uniform & FP32 & Sensor-only static reduction \\
+B4 & Adaptive (fixed $\theta$) & FP32 & Adaptive threshold~\cite{atitallah2023autonomous} \\
+\textbf{P (VABQ)} & \textbf{4/8/16-bit VABQ} & \textbf{INT8 PTQ} & \textbf{Proposed dual-layer} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Baseline B1 represents the energy upper bound (most expensive) and accuracy upper bound (best possible). Baseline B2 isolates the effect of inference-only quantisation, applying standard INT8 PTQ with min-max calibration while keeping sensor resolution at 16 bits. Baseline B3 isolates sensor-level uniform bit reduction, applying static 8-bit ADC resolution to all channels at all times while maintaining FP32 inference. Baseline B4 implements the adaptive threshold method of Atitallah et al.~(2023)~\cite{atitallah2023autonomous}, which uses Kalman-filter-based threshold adaptation for per-channel data transmission suppression. This method operates on transmission decisions rather than ADC bit-width, but provides a representative adaptive sensor-level baseline for comparison.
+
+\subsection{Evaluation Metrics}
+\label{sec:exp_metrics}
+
+Four categories of metrics quantify performance:
+
+\textbf{Signal Fidelity.} Normalised Root Mean Square Error (NRMSE) measures reconstruction accuracy between quantised and original signals per channel:
+\begin{equation}
+    \text{NRMSE}_c = \frac{\sqrt{\frac{1}{T}\sum_{t=1}^{T}(x_c(t) - \hat{x}_c(t))^2}}{x_{c,\max} - x_{c,\min}}
+    \label{eq:nrmse}
+\end{equation}
+where $x_c(t)$ is the ground-truth 16-bit reading, $\hat{x}_c(t)$ is the reconstructed value after quantisation and dequantisation, $T$ is the test period length, and $x_{c,\max}$, $x_{c,\min}$ are the channel-specific full-scale bounds. NRMSE is reported as a percentage, with lower values indicating better fidelity.
+
+\textbf{Classification Performance.} Three metrics assess the 8-class pollutant event classification task: overall accuracy (fraction of correctly classified 10-minute windows), macro-averaged F1-score (unweighted mean of per-class F1), and weighted F1-score (class-frequency-weighted mean). Macro-F1 emphasises minority class performance, while weighted F1 reflects overall classification quality.
+
+\textbf{Energy Metrics.} Four energy components are measured: sensor energy $E_{\text{sensor}}$ (ADC power integrated over test period), inference energy $E_{\text{infer}}$ (per-window CNN forward pass energy multiplied by number of windows), transmission energy $E_{\text{tx}}$ (proportional to transmitted data volume), and total system energy $E_{\text{total}}$ from Equation~(\ref{eq:totalenergy}). All values are normalised to baseline B1 and reported as percentages, with lower values indicating greater efficiency.
+
+\textbf{Bit-Width Distribution.} For VABQ and baseline B4, the percentage of measurement time spent at each bit-width (4, 8, 16 bits) is reported per channel. This characterises the adaptive behaviour and reveals which channels exhibit greater temporal variability.
+
+\subsection{Implementation Details}
+\label{sec:exp_implementation}
+
+The 1D-CNN is implemented in TensorFlow 2.12 and trained on an NVIDIA RTX 3090 GPU. Post-training quantisation uses TensorFlow Lite's built-in PTQ pipeline with min-max calibration on a randomly sampled 10\% calibration subset from the validation month~\cite{nagel2021whitepaper}. The quantised INT8 model is converted to TensorFlow Lite FlatBuffer format and deployed on the ESP32 using TensorFlow Lite for Microcontrollers (TFLM) runtime, version 2.12.
+
+The VABQ sensor-level controller is implemented in C on the ESP32 using the ESP-IDF v5.1 framework (Espressif's official development environment). Rolling statistics use Welford's online algorithm for numerical stability, avoiding catastrophic cancellation in variance computation. Entropy histograms use 16 equally spaced bins per channel to balance resolution and memory overhead (128 bytes per channel for histogram storage). The implementation fits comfortably within the ESP32's 520~KB SRAM alongside the 44~KB INT8 CNN model and operating system overhead.
+
+Energy measurements are validated using an INA219 high-side current sensor connected in series with the ESP32 power supply, sampling voltage and current at 100~Hz. The measured active-mode current of 742~mA at 5.0~V (3.71~W total power) is within 4.5\% of the datasheet specification of 760~mA and the value reported by Karmakar et al.~\cite{esp32power2025,karmakar2024exploring}, confirming measurement accuracy. ADC energy is extracted from total power using profiling experiments that isolate ADC activity from CPU, memory, and radio components.
+
+All experiments are repeated five times with different random seeds for CNN weight initialisation and mini-batch shuffling. Reported values are means with standard deviations indicated where relevant. Statistical significance of accuracy differences between configurations is assessed using paired $t$-tests at significance level $p < 0.05$, with Bonferroni correction for multiple comparisons.
+
+%% ============================================================
+%% END OF SECTION 4
+%% ============================================================
+
 \input{sections/sec5_results}
 \input{sections/sec6_discussion}
 \input{sections/sec7_conclusion}
