@@ -1,72 +1,49 @@
 # Optimizing Sensor Quantisation for Energy Saving in Air Quality Monitoring
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![LaTeX](https://img.shields.io/badge/LaTeX-Paper-blue.svg)](paper/main.tex)
+**Author:** Hamza Farraj  
+**Affiliation:** Department of Computer Science, King Abdulaziz University, Jeddah, Saudi Arabia
 
 ## Overview
 
-This repository contains the LaTeX source and supporting materials for the research paper:
+This repository contains the LaTeX source for a research paper proposing the **Variance-Aware Adaptive Bit-Width Quantisation (VABQ)** framework. VABQ jointly optimises sensor-level ADC resolution and inference-level post-training quantisation (PTQ) to minimise total system energy in IoT air quality monitoring networks.
 
-> **Optimizing Sensor Quantisation for Energy Saving in Air Quality Monitoring**
->
-> *Hamza Farraj*
-> Department of Computer Science, King Abdulaziz University, Jeddah, Saudi Arabia
+## Key Results
 
-## Abstract
+| Metric | Value |
+|--------|-------|
+| Total system energy saving | **64.6%** |
+| Sensor-level ADC energy saving | 61.3% |
+| Inference energy saving (INT8 PTQ) | 74.8% |
+| Classification accuracy (8-class) | 96.1% |
+| Signal reconstruction NRMSE | < 2.4% |
+| Mean adaptive bit-width | 6.77 bits (vs 16-bit baseline) |
 
-This paper proposes a **Variance-Aware Adaptive Bit-Width Quantisation (VABQ)** framework that jointly optimises sensor-level ADC resolution and inference-level post-training quantisation (PTQ) to minimise energy consumption in IoT-based air quality monitoring while preserving monitoring fidelity.
+## Paper Structure
 
-### Key Results
-- **61.3%** reduction in sensor-level ADC energy consumption
-- **74.8%** reduction in inference energy
-- **64.6%** total system energy saving
-- Classification accuracy maintained above **96.1%**
-- Signal reconstruction NRMSE below **2.4%**
-
-## Methodology: VABQ Framework
-
-The framework operates in two cascaded stages:
-
-### Stage 1: Variance-Aware Sensor Quantisation
-- Rolling variance computation over 10-minute sliding windows
-- Shannon entropy estimation for information-theoretic content
-- Variance-entropy criterion dynamically selects between **4-bit**, **8-bit**, and **16-bit** ADC resolution
-- Exploits the periodic structure of indoor air quality signals
-
-### Stage 2: Inference-Level Post-Training Quantisation
-- Lightweight 1D-CNN (~45K parameters) for pollutant event classification
-- INT8 post-training quantisation using min-max calibration
-- Deployable within ESP32's 520 KB SRAM
+```
+paper/
+├── main.tex                    # Master document
+├── references.bib              # 40 citations (2020-2026, 34 from 2023+)
+└── sections/
+    ├── abstract.tex            # Abstract + keywords
+    ├── sec1_introduction.tex   # Motivation, problem, contributions, organisation
+    ├── sec2_related_work.tex   # 6 subsections + research gap table
+    ├── sec3_methodology.tex    # System overview, Stage 1, Stage 2, unified objective
+    ├── sec4_experiments.tex    # Dataset, partitioning, baselines, metrics, implementation
+    ├── sec5_results.tex        # 7 subsections with 6 tables
+    ├── sec6_discussion.tex     # Practical, generalisability, NAS, novelty, limitations
+    └── sec7_conclusion.tex     # Summary and future work
+```
 
 ## Dataset
 
-**DALTON** — Indoor air quality dataset from IIT Kharagpur:
-- 28 deployment sites (households, apartments, labs, canteens, classrooms)
-- 3 months of continuous monitoring
-- 8 sensor channels: PM₂.₅, PM₁₀, CO₂, VOC, CO, NO₂, Temperature, Humidity
-- 1 Hz sampling rate, 42 occupants with annotated activities
-- ESP32-based sensor nodes (ESP-WROOM-32)
+**DALTON** — Indoor Air Quality Dataset with Activities of Daily Living  
+- 30 indoor sites, 4 geographic regions, 46 occupants  
+- 6 months (summer + winter), 1 Hz sampling  
+- 8 channels: PM₂.₅, PM₁₀, CO₂, VOC, CO, NO₂, temperature, humidity  
+- [Karmakar et al., NeurIPS 2024 Datasets Track](https://arxiv.org/abs/2407.14501)
 
-## Repository Structure
-
-```
-├── paper/
-│   ├── main.tex              # Main LaTeX document
-│   ├── references.bib        # Bibliography
-│   └── sections/
-│       ├── abstract.tex       # Abstract
-│       ├── sec1_introduction.tex
-│       ├── sec2_related_work.tex
-│       ├── sec3_methodology.tex
-│       ├── sec4_experiments.tex
-│       ├── sec5_results.tex
-│       ├── sec6_discussion.tex
-│       └── sec7_conclusion.tex
-├── README.md
-└── .gitignore
-```
-
-## Building the Paper
+## Build
 
 ```bash
 cd paper
@@ -76,28 +53,13 @@ pdflatex main.tex
 pdflatex main.tex
 ```
 
-Or using `latexmk`:
-```bash
-cd paper
-latexmk -pdf main.tex
-```
+## Citation Count Verification
 
-## Citation
-
-If you use this work, please cite:
-
-```bibtex
-@article{farraj2026vabq,
-  title={Optimizing Sensor Quantisation for Energy Saving in Air Quality Monitoring},
-  author={Farraj, Hamza},
-  year={2026}
-}
-```
-
-## Keywords
-
-Sensor quantisation · Energy efficiency · Air quality monitoring · Adaptive bit-width · Post-training quantisation · Edge AI · Internet of Things · DALTON
+40 unique BibTeX entries in `references.bib`, all cited in the manuscript:
+- 2025-2026: 14 citations
+- 2023-2024: 20 citations  
+- 2020-2022: 6 citations (foundational works)
 
 ## License
 
-This project is licensed under the MIT License.
+This work is provided for academic purposes.

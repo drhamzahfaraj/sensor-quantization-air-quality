@@ -1,38 +1,46 @@
 \section{Methodology}
 \label{sec:methodology}
 
-\subsection{System Overview}
+This section presents the VABQ framework in four parts: system overview, sensor-level adaptive quantisation (Stage~1), inference-level PTQ (Stage~2), and the unified optimisation objective.
 
-The proposed VABQ framework operates in two cascaded stages on the ESP32-based DALTON platform. Stage~1 (Sensor-Level Adaptive Quantisation) dynamically adjusts the ADC resolution for each sensor channel based on real-time signal statistics. Stage~2 (Inference-Level Post-Training Quantisation) applies INT8 PTQ to a lightweight 1D-CNN deployed for pollutant event classification. Both stages are governed by a shared variance-entropy criterion that ensures coherent optimisation across the sensing-inference pipeline.
+\subsection{System Overview}
+\label{sec:meth_overview}
+
+Fig.~\ref{fig:overview} illustrates the VABQ pipeline. Stage~1 operates at the ADC of each sensor channel, computing rolling variance and entropy to determine per-channel bit-width allocation (4, 8, or 16 bits). Stage~2 applies INT8 PTQ to a lightweight 1D-CNN deployed on the same ESP32 microcontroller for pollutant event classification. Both stages are governed by a shared variance-entropy criterion.
+
+The design rationale is twofold. First, indoor pollutant signals exhibit strong temporal structure: long stable periods (nighttime, unoccupied rooms) interspersed with sharp, activity-driven transients (cooking, cleaning, ventilation changes)~\cite{karmakar2024exploring, karmakar2024indoor}. During stable periods, low-resolution sampling captures all relevant information; during transients, full resolution preserves critical features. Second, model inference dominates computational energy on edge devices; PTQ to INT8 provides the optimal accuracy-efficiency trade-off for lightweight CNNs~\cite{enhancingcnn2024, palakodety2025tpu}.
 
 \subsection{Stage 1: Variance-Aware Sensor Quantisation}
+\label{sec:meth_stage1}
 
 \subsubsection{Rolling Variance Computation}
 
-For each sensor channel $c \in \{\text{PM}_{2.5}, \text{PM}_{10}, \text{CO}_2, \text{VOC}, \text{CO}, \text{NO}_2, T, RH\}$, the rolling variance is computed over a sliding window of duration $\tau = 10$ minutes (600 samples at 1~Hz), consistent with the empirically validated window used in the DALTON HHI computation \cite{karmakar2024exploring}:
+For each sensor channel $c \in \{\text{PM}_{2.5}, \text{PM}_{10}, \text{CO}_2, \text{VOC}, \text{CO}, \text{NO}_2, T, RH\}$, the rolling variance over a sliding window of $\tau = 600$ samples (10 minutes at 1~Hz), consistent with the DALTON HHI window~\cite{karmakar2024exploring}, is:
 \begin{equation}
     \sigma_c^2(t) = \frac{1}{\tau} \sum_{i=t-\tau+1}^{t} \left( x_c(i) - \bar{x}_c(t) \right)^2
     \label{eq:variance}
 \end{equation}
-where $x_c(i)$ is the raw sensor reading at time $i$, and $\bar{x}_c(t) = \frac{1}{\tau} \sum_{i=t-\tau+1}^{t} x_c(i)$ is the rolling mean.
+where $x_c(i)$ is the raw reading at time $i$ and $\bar{x}_c(t) = \frac{1}{\tau} \sum_{i=t-\tau+1}^{t} x_c(i)$ is the rolling mean. In practice, Equation~(\ref{eq:variance}) is computed incrementally using Welford's online algorithm, requiring only three scalars per channel (count $n$, running mean $\bar{x}$, and running sum of squares $M_2$), with $O(1)$ per-sample update complexity and $O(1)$ memory~\cite{atitallah2023autonomous}.
 
 \subsubsection{Signal Entropy Estimation}
 
-To complement variance with information-theoretic content, the normalised Shannon entropy of the quantised signal within the window is estimated as:
+To complement variance with information-theoretic content, the normalised Shannon entropy of the quantised signal within the window is computed as:
 \begin{equation}
     H_c(t) = -\sum_{k=1}^{K} p_k \log_2 p_k
     \label{eq:entropy}
 \end{equation}
-where $p_k$ is the empirical probability of the $k$-th quantisation level within the window, and $K$ is the number of distinct levels observed. This entropy measure captures the effective information content of the signal, distinguishing between genuinely varying signals and noisy but static ones.
+where $p_k$ is the empirical probability of the $k$-th quantisation level and $K$ is the number of distinct levels observed. Entropy distinguishes genuinely varying signals from noisy-but-static ones, providing a complementary measure to variance.
 
-\subsubsection{Variance-Entropy Criterion}
+\subsubsection{Variance-Entropy Criterion and Bit-Width Assignment}
 
-The composite decision metric $\Gamma_c(t)$ combines the normalised variance and entropy:
+The composite decision metric combines normalised variance and entropy:
 \begin{equation}
     \Gamma_c(t) = \alpha \cdot \frac{\sigma_c^2(t)}{\sigma_{c,\max}^2} + (1 - \alpha) \cdot \frac{H_c(t)}{H_{c,\max}}
     \label{eq:gamma}
 \end{equation}
-where $\sigma_{c,\max}^2$ and $H_{c,\max}$ are the maximum observed variance and entropy for channel $c$ computed from a calibration subset (the first week of deployment data), and $\alpha \in [0, 1]$ is a weighting parameter. Through grid search on the calibration subset, $\alpha = 0.65$ was found to optimally balance the two components. The bit-width is then assigned according to:
+where $\sigma_{c,\max}^2$ and $H_{c,\max}$ are channel-specific maxima computed from a calibration subset (first week of deployment), and $\alpha \in [0, 1]$ weights the two components. Grid search on the calibration data yields $\alpha = 0.65$ as optimal.
+
+Bit-width assignment follows a three-tier rule:
 \begin{equation}
     b_c(t) = \begin{cases}
         4 & \text{if } \Gamma_c(t) < \theta_L \\
@@ -41,74 +49,102 @@ where $\sigma_{c,\max}^2$ and $H_{c,\max}$ are the maximum observed variance and
     \end{cases}
     \label{eq:bitwidth}
 \end{equation}
-where $\theta_L = 0.15$ and $\theta_H = 0.55$ are threshold values determined by minimising the Lagrangian:
+where $\theta_L = 0.15$ and $\theta_H = 0.55$ are determined by minimising the Lagrangian:
 \begin{equation}
     \mathcal{L}(\theta_L, \theta_H) = \lambda_E \cdot E_{\text{ADC}}(\theta_L, \theta_H) + \lambda_D \cdot D(\theta_L, \theta_H)
     \label{eq:lagrangian}
 \end{equation}
-with $E_{\text{ADC}}$ denoting the time-averaged ADC energy, $D$ denoting the signal reconstruction distortion (RMSE), and $\lambda_E, \lambda_D$ being Lagrange multipliers set to achieve a target RMSE of 2.5\% full-scale range.
+with $E_{\text{ADC}}$ denoting time-averaged ADC energy, $D$ denoting signal reconstruction RMSE, and Lagrange multipliers $\lambda_E$, $\lambda_D$ set to enforce a target RMSE of 2.5\% full-scale range.
 
 \subsubsection{ADC Energy Model}
 
-The instantaneous ADC power for channel $c$ at time $t$ is modelled using the Walden FoM relationship \cite{andrulis2024adc}:
+Instantaneous ADC power for channel $c$ at time $t$ follows the Walden FoM~\cite{andrulis2024adc, waldenADC2018}:
 \begin{equation}
     P_c(t) = \text{FoM}_W \cdot 2^{b_c(t)} \cdot f_s
     \label{eq:adcpower}
 \end{equation}
-where $\text{FoM}_W = 10$~fJ/conv-step (representative of SAR ADCs suitable for ESP32-class platforms \cite{waldenADC2018}) and $f_s = 1$~Hz. The total sensor-level energy over a measurement period $T$ for all $C = 8$ channels is:
+with $\text{FoM}_W = 10$~fJ/conv-step (representative of ESP32-class SAR ADCs) and $f_s = 1$~Hz. Total sensor energy over period $T$ across $C = 8$ channels is:
 \begin{equation}
     E_{\text{sensor}} = \sum_{c=1}^{C} \sum_{t=1}^{T} P_c(t) \cdot \Delta t
     \label{eq:sensorenergy}
 \end{equation}
 The energy saving relative to a uniform 16-bit baseline is:
 \begin{equation}
-    \Delta E_{\text{sensor}} = 1 - \frac{E_{\text{sensor}}^{\text{VABQ}}}{E_{\text{sensor}}^{16\text{-bit}}}
+    \Delta E_{\text{sensor}} = 1 - \frac{E_{\text{sensor}}^{\text{VABQ}}}{E_{\text{sensor}}^{\text{16-bit}}}
     \label{eq:sensorsaving}
 \end{equation}
 
+Conceptually, reducing bit-width from 16 to 4 bits reduces per-sample ADC energy by $2^{16}/2^4 = 4096\times$ in theory. In practice, fixed overhead circuitry moderates this to approximately 15$\times$~\cite{andrulis2024adc, reconfigADC2025}. This exponential dependence is the principal mechanism driving sensor-level energy savings.
+
 \subsection{Stage 2: Inference-Level Post-Training Quantisation}
+\label{sec:meth_stage2}
 
 \subsubsection{Lightweight 1D-CNN Architecture}
 
-A compact 1D-CNN is designed for multi-class pollutant event classification. The architecture consists of three convolutional blocks followed by a global average pooling layer and a fully connected classifier. Each convolutional block contains: a 1D convolution with kernel size 5, batch normalisation, ReLU activation, and max pooling with stride 2. The three blocks have 16, 32, and 64 filters respectively. The classifier comprises a 64-unit dense layer with dropout (0.3) and a softmax output layer. Input dimensions are $(600 \times 8)$, corresponding to 10-minute windows of 8 sensor channels.
+A compact 1D-CNN is designed for eight-class pollutant event classification. The architecture consists of three convolutional blocks, each containing: a 1D convolution (kernel size 5), batch normalisation, ReLU activation, and max pooling (stride 2). Filter counts are 16, 32, and 64 respectively. A global average pooling layer feeds a classifier with a 64-unit dense layer, dropout (0.3), and softmax output. Input dimensions are $(600 \times 8)$, corresponding to 10-minute windows of 8 channels.
 
-The total parameter count is approximately 45,000, yielding a model size of 176~KB in FP32 and 44~KB in INT8---well within the ESP32's 520~KB SRAM \cite{karmakar2024exploring}. The architecture is intentionally kept shallow and narrow to ensure real-time inference on the ESP32 at the target 0.1~Hz classification rate (one inference per 10-minute window). This design philosophy aligns with TinyML principles for resource-constrained edge inference \cite{akhyar2025tinyml, tinytrain2024}.
+The model contains approximately 45,000 parameters, yielding 176~KB in FP32 and 44~KB in INT8---well within the ESP32's 520~KB SRAM~\cite{karmakar2024exploring}. This shallow, narrow design ensures real-time inference at 0.1~Hz (one classification per 10-minute window), consistent with TinyML deployment principles~\cite{akhyar2025tinyml, tinytrain2024}.
 
-The model is trained in FP32 on the first two months of DALTON data using the Adam optimiser (learning rate 0.001, batch size 64, 50 epochs) with categorical cross-entropy loss. The classification targets are eight indoor activity classes annotated by the 42 occupants: cooking, cleaning, sleeping, ventilation change, idle (unoccupied), electronic device use, eating/dining, and other activities \cite{karmakar2024exploring, karmakar2024indoor}.
+Training uses FP32 precision on the first two months of DALTON data with Adam optimiser (learning rate $10^{-3}$, batch size 64, 50 epochs) and categorical cross-entropy loss. The eight target classes---cooking, cleaning, sleeping, ventilation change, idle, electronic device use, eating/dining, and other---are annotated by the 42 occupants via the VocalAnnot application~\cite{karmakar2024exploring, karmakar2024indoor}.
 
 \subsubsection{Post-Training Quantisation Procedure}
 
-INT8 PTQ is applied to the trained FP32 model using min-max calibration on a held-out calibration set (10\% of training data). For each layer $l$, the quantisation function maps floating-point values $x$ to 8-bit integers \cite{nagel2021whitepaper, quantsurvey2021}:
+INT8 PTQ is applied using min-max calibration on a held-out set (10\% of training data). For layer $l$, the quantisation function maps floating-point values to 8-bit integers~\cite{nagel2021whitepaper, quantsurvey2021}:
 \begin{equation}
     x_q = \text{clip}\left(\left\lfloor \frac{x}{s_l} \right\rceil + z_l, \; 0, \; 255\right)
     \label{eq:ptq}
 \end{equation}
-where $s_l = \frac{x_{\max}^{(l)} - x_{\min}^{(l)}}{255}$ is the per-layer scale factor, $z_l = -\left\lfloor \frac{x_{\min}^{(l)}}{s_l} \right\rceil$ is the zero-point, and $\lfloor \cdot \rceil$ denotes round-to-nearest. This standard asymmetric uniform quantisation is preferred over more complex approaches such as QDrop \cite{qdrop2023} or SmoothQuant \cite{smoothquant2024} due to its simplicity and full compatibility with TensorFlow Lite's runtime on the ESP32.
+where $s_l = (x_{\max}^{(l)} - x_{\min}^{(l)}) / 255$ is the per-layer scale factor, $z_l = -\lfloor x_{\min}^{(l)} / s_l \rceil$ is the zero-point, and $\lfloor \cdot \rceil$ denotes round-to-nearest. This standard asymmetric uniform quantisation is selected over more complex approaches (QDrop~\cite{qdrop2023}, SmoothQuant~\cite{smoothquant2024}) for its simplicity and full TensorFlow Lite compatibility on the ESP32.
 
 \subsubsection{Inference Energy Model}
 
-The inference energy per forward pass is estimated as:
+Inference energy per forward pass is:
 \begin{equation}
     E_{\text{infer}} = \sum_{l=1}^{L} N_l^{\text{MAC}} \cdot e_{b_l}
     \label{eq:inferenergy}
 \end{equation}
-where $N_l^{\text{MAC}}$ is the number of multiply-accumulate operations in layer $l$, and $e_{b_l}$ is the energy per MAC at bit-width $b_l$. Using established energy estimates \cite{guo2020fixedpoint, vsquant2021}: $e_{32} = 3.7$~pJ for FP32, $e_{16} = 0.9$~pJ for FP16, and $e_8 = 0.2$~pJ for INT8. The energy reduction from FP32 to INT8 inference is thus approximately:
+where $N_l^{\text{MAC}}$ is the MAC count in layer $l$ and $e_{b_l}$ is energy per MAC at bit-width $b_l$. Using established estimates~\cite{guo2020fixedpoint, vsquant2021}: $e_{32} = 3.7$~pJ (FP32), $e_{16} = 0.9$~pJ (FP16), $e_8 = 0.2$~pJ (INT8). The per-MAC reduction from FP32 to INT8 is:
 \begin{equation}
-    \Delta E_{\text{infer}} = 1 - \frac{e_8}{e_{32}} = 1 - \frac{0.2}{3.7} \approx 94.6\%
-    \label{eq:infersaving}
+    \Delta E_{\text{MAC}} = 1 - \frac{e_8}{e_{32}} = 1 - \frac{0.2}{3.7} \approx 94.6\%
+    \label{eq:macsaving}
 \end{equation}
-per MAC operation. Including memory access overhead (which scales approximately linearly with bit-width) and control logic (bit-width independent), the effective reduction is moderated to approximately 74.8\% \cite{enhancingcnn2024}.
+Including memory access overhead (linear with bit-width) and control logic (bit-width independent), the effective system-level inference energy reduction is approximately 74.8\%~\cite{enhancingcnn2024, edgempq2024}.
 
 \subsection{Unified Optimisation Objective}
+\label{sec:meth_unified}
 
-The total system energy per inference window is:
+Total system energy per inference window is:
 \begin{equation}
     E_{\text{total}} = E_{\text{sensor}} + E_{\text{tx}} + E_{\text{infer}} + E_{\text{idle}}
     \label{eq:totalenergy}
 \end{equation}
-where $E_{\text{tx}}$ is the wireless transmission energy (proportional to data volume) and $E_{\text{idle}}$ is the baseline platform consumption. The VABQ framework minimises $E_{\text{total}}$ subject to constraints on classification accuracy $A \geq A_{\min}$ and reconstruction RMSE $D \leq D_{\max}$:
+where $E_{\text{tx}}$ is wireless transmission energy (proportional to data volume, hence to mean bit-width) and $E_{\text{idle}}$ is baseline platform consumption. VABQ minimises $E_{\text{total}}$ subject to quality constraints:
 \begin{equation}
     \min_{\theta_L, \theta_H, \alpha} \; E_{\text{total}}(\theta_L, \theta_H, \alpha) \quad \text{s.t.} \quad A \geq 0.95, \; D \leq 0.025 \cdot R_{\text{FS}}
     \label{eq:optimization}
 \end{equation}
-where $R_{\text{FS}}$ is the full-scale range of each sensor channel.
+where $A$ is classification accuracy, $D$ is reconstruction RMSE, and $R_{\text{FS}}$ is full-scale sensor range. The three hyperparameters ($\theta_L$, $\theta_H$, $\alpha$) are optimised via grid search on the calibration subset, requiring fewer than 2,000 evaluations and completing in under 10 minutes on the ESP32.
+
+Algorithm~\ref{alg:vabq} summarises the VABQ procedure at runtime.
+
+\begin{algorithm}[H]
+\SetAlgoLined
+\KwIn{Sensor readings $x_c(t)$, thresholds $\theta_L$, $\theta_H$, weight $\alpha$, window $\tau$}
+\KwOut{Bit-width $b_c(t)$, classification $\hat{y}(t)$}
+\For{each time step $t$}{
+    \For{each channel $c = 1, \ldots, 8$}{
+        Update $\bar{x}_c(t)$, $\sigma_c^2(t)$ via Welford's algorithm\;
+        Update histogram and compute $H_c(t)$\;
+        Compute $\Gamma_c(t)$ via Eq.~(\ref{eq:gamma})\;
+        Assign $b_c(t)$ via Eq.~(\ref{eq:bitwidth})\;
+        Sample $x_c(t)$ at $b_c(t)$-bit resolution\;
+    }
+    \If{$t \mod \tau = 0$}{
+        Construct input tensor $(\tau \times 8)$\;
+        Run INT8 1D-CNN forward pass\;
+        Output classification $\hat{y}(t)$\;
+    }
+}
+\caption{VABQ Runtime Procedure}
+\label{alg:vabq}
+\end{algorithm}
