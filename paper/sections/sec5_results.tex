@@ -3,7 +3,7 @@
 
 \subsection{Temporal Signal Characteristics}
 
-Analysis of the DALTON dataset confirms the strong periodic structure of indoor pollutant signals that VABQ exploits. Kitchen VOC measurements exhibit sharp transient peaks reaching 800+~ppb during cooking events, with rapid decay under ventilated conditions but prolonged lingering (hours) under poor ventilation \cite{karmakar2024exploring}. Bedroom CO$_2$ accumulates overnight during sleep with AC operation, reaching median levels exceeding 1200~ppm due to closed windows and recirculated air. Temperature shows steady diurnal trends with relatively low variance outside of direct ventilation changes. Humidity correlates with cooking and seasonal changes, increasing noticeably during the second month of the study.
+Analysis of the DALTON dataset confirms the strong periodic structure of indoor pollutant signals that VABQ exploits. Kitchen VOC measurements exhibit sharp transient peaks reaching 800+~ppb during cooking events, with rapid decay under ventilated conditions but prolonged lingering (hours) under poor ventilation \cite{karmakar2024exploring}. Bedroom CO$_2$ accumulates overnight during sleep with AC operation, reaching median levels exceeding 1200~ppm due to closed windows and recirculated air \cite{karmakar2024indoor}. Temperature shows steady diurnal trends with relatively low variance outside of direct ventilation changes. Humidity correlates with cooking and seasonal changes, increasing noticeably during the second month of the study.
 
 The rolling variance analysis reveals that across all sites and channels, signals remain in the low-variance regime ($\Gamma_c(t) < \theta_L = 0.15$) for 62.7\% of the total measurement time. The medium-variance regime ($\theta_L \leq \Gamma_c(t) < \theta_H = 0.55$) accounts for 24.1\% of the time, while the high-variance regime ($\Gamma_c(t) \geq \theta_H$) occupies only 13.2\%. This distribution is highly favourable for energy saving, as the majority of time is spent at 4-bit resolution.
 
@@ -107,9 +107,9 @@ B4: Adapt. Thresh. & 0.547 & 0.623 & 1.000 & 0.723 & 27.7\% \\
 \end{tabular}
 \end{table}
 
-VABQ achieves a 61.3\% reduction in sensor-level ADC energy (from 1.000 to 0.387), primarily through 4-bit allocation during the 59.5\% of time when signals are in the low-variance regime. The transmission energy reduction of 57.7\% follows directly from the reduced data volume: the mean bit-width of 6.77 bits versus the 16-bit baseline yields a proportional data volume reduction. The inference energy reduction of 74.8\% results from INT8 PTQ of the 1D-CNN. The compound effect produces a total system energy saving of 64.6\%.
+VABQ achieves a 61.3\% reduction in sensor-level ADC energy (from 1.000 to 0.387), primarily through 4-bit allocation during the 59.5\% of time when signals are in the low-variance regime. The transmission energy reduction of 57.7\% follows directly from the reduced data volume: the mean bit-width of 6.77 bits versus the 16-bit baseline yields a proportional data volume reduction. The inference energy reduction of 74.8\% results from INT8 PTQ of the 1D-CNN \cite{smoothquant2024, palakodety2025tpu}. The compound effect produces a total system energy saving of 64.6\%.
 
-The exponential relationship between ADC bit-width and energy is the key driver of sensor-level savings. Under the Walden FoM model (Equation~\ref{eq:walden}), switching from 16-bit to 4-bit reduces per-sample ADC energy by a factor of $2^{16}/2^4 = 4096$, though this theoretical maximum is moderated by fixed overhead circuitry to an effective factor of approximately 15$\times$ in practice.
+The exponential relationship between ADC bit-width and energy is the key driver of sensor-level savings. Under the Walden FoM model (Equation~\ref{eq:walden}), switching from 16-bit to 4-bit reduces per-sample ADC energy by a factor of $2^{16}/2^4 = 4096$, though this theoretical maximum is moderated by fixed overhead circuitry to an effective factor of approximately 15$\times$ in practice \cite{andrulis2024adc, reconfigADC2025}.
 
 \subsection{Comparison with Existing Approaches}
 
@@ -119,16 +119,18 @@ To contextualise the VABQ results, a comparison is drawn with published methods 
 \centering
 \caption{Comparison of VABQ with existing approaches in the literature.}
 \label{tab:comparison}
-\begin{tabular}{@{}p{3cm}cccp{1.8cm}c@{}}
+\begin{tabular}{@{}p{3cm}cccc@{}}
 \toprule
-\textbf{Method} & \textbf{Year} & \textbf{Energy Saving} & \textbf{Acc. Impact} & \textbf{Dual-Layer} \\
+\textbf{Method} & \textbf{Year} & \textbf{Energy Saving} & \textbf{Acc. Impact} & \textbf{Dual} \\
 \midrule
-Adaptive Threshold \cite{atitallah2023autonomous} & 2023 & 17.3\% (reduct.) & $\pm$11.7\% & No \\
-SAX-LZW \cite{aljanabi2022sax} & 2022 & $\sim$40\% data red. & $\sim$5\% loss & No \\
-Bounded-Error \cite{azar2020bounded} & 2020 & $\sim$35\% data red. & Bounded & No \\
+Adaptive Thresh. \cite{atitallah2023autonomous} & 2023 & 17.3\% reduct. & $\pm$11.7\% & No \\
+SAX-LZW \cite{aljanabi2022sax} & 2022 & $\sim$40\% data & $\sim$5\% loss & No \\
+Bounded-Error \cite{azar2020bounded} & 2020 & $\sim$35\% data & Bounded & No \\
 SmoothQuant \cite{smoothquant2024} & 2024 & $\sim$75\% infer. & $<$1\% loss & No \\
+Q-Learning Tx \cite{qlearning2025airquality} & 2025 & 40--50\% Tx & Maintained & No \\
 TinyML Ozone \cite{akhyar2025tinyml} & 2025 & Low-power & $R^2$=0.95 & No \\
-\textbf{VABQ (Proposed)} & \textbf{2026} & \textbf{64.6\% total} & \textbf{1.6\% loss} & \textbf{Yes} \\
+EdgeMLOps \cite{edgemlops2025} & 2025 & INT8 speedup & Maintained & No \\
+\textbf{VABQ (Ours)} & \textbf{2026} & \textbf{64.6\% total} & \textbf{1.6\% loss} & \textbf{Yes} \\
 \bottomrule
 \end{tabular}
 \end{table}

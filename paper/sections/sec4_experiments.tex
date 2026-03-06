@@ -3,9 +3,9 @@
 
 \subsection{Dataset Description}
 
-Experiments use the DALTON dataset collected over a three-month period across 28 indoor deployment sites comprising households (39.3\%), studio apartments (28.6\%), research labs (17.9\%), food canteens (7.1\%), and classrooms (7.1\%) \cite{karmakar2024exploring}. Site areas range from 150 to 1100~sq~ft, with 1--6 sensors deployed per site and 42 participating occupants annotating activities via the VocalAnnot mobile application. The eight sensor channels---PM$_{2.5}$, PM$_{10}$, CO$_2$, VOC, CO, NO$_2$, temperature, and relative humidity---are sampled at 1~Hz, yielding approximately 7.26 million samples per channel over the study period.
+Experiments use the DALTON dataset collected over a three-month period across 28 indoor deployment sites comprising households (39.3\%), studio apartments (28.6\%), research labs (17.9\%), food canteens (7.1\%), and classrooms (7.1\%) \cite{karmakar2024exploring, karmakar2024indoor}. Site areas range from 150 to 1100~sq~ft, with 1--6 sensors deployed per site and 42 participating occupants annotating activities via the VocalAnnot mobile application. The eight sensor channels---PM$_{2.5}$, PM$_{10}$, CO$_2$, VOC, CO, NO$_2$, temperature, and relative humidity---are sampled at 1~Hz, yielding approximately 7.26 million samples per channel over the study period.
 
-The DALTON sensor node is built on the ESP-WROOM-32 chip with a maximum power draw of 3.55~W (760~mA at 5~V DC). Each node weighs 160~g and measures $112 \times 112 \times 55$~mm, with an approximate cost of \$250 per unit \cite{karmakar2024exploring}.
+The DALTON sensor node is built on the ESP-WROOM-32 chip with a maximum power draw of 3.55~W (760~mA at 5~V DC). Each node weighs 160~g and measures $112 \times 112 \times 55$~mm, with an approximate cost of \$250 per unit \cite{karmakar2024exploring}. This cost is competitive with other IoT air quality monitoring platforms reported in recent surveys \cite{dimitriou2025innovations, enviroiot2025}.
 
 \subsection{Data Partitioning}
 
@@ -24,10 +24,10 @@ Five configurations are compared, as summarised in Table~\ref{tab:baselines}.
 \textbf{Config.} & \textbf{Sensor Quant.} & \textbf{Inference Quant.} & \textbf{Description} \\
 \midrule
 B1 & 16-bit uniform & FP32 & Full precision baseline \\
-B2 & 16-bit uniform & INT8 PTQ & Inference-only quantisation \\
+B2 & 16-bit uniform & INT8 PTQ & Inference-only quant. \cite{smoothquant2024} \\
 B3 & 8-bit uniform & FP32 & Sensor-only static quant. \\
 B4 & Adaptive (fixed $\theta$) & FP32 & Adaptive threshold \cite{atitallah2023autonomous} \\
-\textbf{P (VABQ)} & \textbf{4/8/16-bit adaptive} & \textbf{INT8 PTQ} & \textbf{Dual-layer (proposed)} \\
+\textbf{P} & \textbf{4/8/16-bit adaptive} & \textbf{INT8 PTQ} & \textbf{Dual-layer (proposed)} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -50,4 +50,4 @@ The following metrics are reported:
 
 \subsection{Implementation Details}
 
-The 1D-CNN is implemented in TensorFlow 2.12 and quantised using TensorFlow Lite's PTQ pipeline. The VABQ sensor-level controller is implemented in C on the ESP32 using the ESP-IDF framework. Rolling variance and entropy are computed incrementally using Welford's online algorithm to minimise memory overhead. All energy measurements are validated against measured current draw using an INA219 current sensor module connected in series with the ESP32 power supply.
+The 1D-CNN is implemented in TensorFlow 2.12 and quantised using TensorFlow Lite's PTQ pipeline, following the standard min-max calibration approach \cite{nagel2021whitepaper}. The VABQ sensor-level controller is implemented in C on the ESP32 using the ESP-IDF framework. Rolling variance and entropy are computed incrementally using Welford's online algorithm to minimise memory overhead. All energy measurements are validated against measured current draw using an INA219 current sensor module connected in series with the ESP32 power supply \cite{esp32power2025, reducingpower2024}.

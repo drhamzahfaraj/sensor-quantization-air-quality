@@ -72,9 +72,9 @@ The energy saving relative to a uniform 16-bit baseline is:
 
 A compact 1D-CNN is designed for multi-class pollutant event classification. The architecture consists of three convolutional blocks followed by a global average pooling layer and a fully connected classifier. Each convolutional block contains: a 1D convolution with kernel size 5, batch normalisation, ReLU activation, and max pooling with stride 2. The three blocks have 16, 32, and 64 filters respectively. The classifier comprises a 64-unit dense layer with dropout (0.3) and a softmax output layer. Input dimensions are $(600 \times 8)$, corresponding to 10-minute windows of 8 sensor channels.
 
-The total parameter count is approximately 45,000, yielding a model size of 176~KB in FP32 and 44~KB in INT8---well within the ESP32's 520~KB SRAM \cite{karmakar2024exploring}. The architecture is intentionally kept shallow and narrow to ensure real-time inference on the ESP32 at the target 0.1~Hz classification rate (one inference per 10-minute window).
+The total parameter count is approximately 45,000, yielding a model size of 176~KB in FP32 and 44~KB in INT8---well within the ESP32's 520~KB SRAM \cite{karmakar2024exploring}. The architecture is intentionally kept shallow and narrow to ensure real-time inference on the ESP32 at the target 0.1~Hz classification rate (one inference per 10-minute window). This design philosophy aligns with TinyML principles for resource-constrained edge inference \cite{akhyar2025tinyml, tinytrain2024}.
 
-The model is trained in FP32 on the first two months of DALTON data using the Adam optimiser (learning rate 0.001, batch size 64, 50 epochs) with categorical cross-entropy loss. The classification targets are eight indoor activity classes annotated by the 42 occupants: cooking, cleaning, sleeping, ventilation change, idle (unoccupied), electronic device use, eating/dining, and other activities \cite{karmakar2024exploring}.
+The model is trained in FP32 on the first two months of DALTON data using the Adam optimiser (learning rate 0.001, batch size 64, 50 epochs) with categorical cross-entropy loss. The classification targets are eight indoor activity classes annotated by the 42 occupants: cooking, cleaning, sleeping, ventilation change, idle (unoccupied), electronic device use, eating/dining, and other activities \cite{karmakar2024exploring, karmakar2024indoor}.
 
 \subsubsection{Post-Training Quantisation Procedure}
 
@@ -83,7 +83,7 @@ INT8 PTQ is applied to the trained FP32 model using min-max calibration on a hel
     x_q = \text{clip}\left(\left\lfloor \frac{x}{s_l} \right\rceil + z_l, \; 0, \; 255\right)
     \label{eq:ptq}
 \end{equation}
-where $s_l = \frac{x_{\max}^{(l)} - x_{\min}^{(l)}}{255}$ is the per-layer scale factor, $z_l = -\left\lfloor \frac{x_{\min}^{(l)}}{s_l} \right\rceil$ is the zero-point, and $\lfloor \cdot \rceil$ denotes round-to-nearest.
+where $s_l = \frac{x_{\max}^{(l)} - x_{\min}^{(l)}}{255}$ is the per-layer scale factor, $z_l = -\left\lfloor \frac{x_{\min}^{(l)}}{s_l} \right\rceil$ is the zero-point, and $\lfloor \cdot \rceil$ denotes round-to-nearest. This standard asymmetric uniform quantisation is preferred over more complex approaches such as QDrop \cite{qdrop2023} or SmoothQuant \cite{smoothquant2024} due to its simplicity and full compatibility with TensorFlow Lite's runtime on the ESP32.
 
 \subsubsection{Inference Energy Model}
 
@@ -97,7 +97,7 @@ where $N_l^{\text{MAC}}$ is the number of multiply-accumulate operations in laye
     \Delta E_{\text{infer}} = 1 - \frac{e_8}{e_{32}} = 1 - \frac{0.2}{3.7} \approx 94.6\%
     \label{eq:infersaving}
 \end{equation}
-per MAC operation. Including memory access overhead (which scales approximately linearly with bit-width) and control logic (bit-width independent), the effective reduction is moderated to approximately 74.8\%.
+per MAC operation. Including memory access overhead (which scales approximately linearly with bit-width) and control logic (bit-width independent), the effective reduction is moderated to approximately 74.8\% \cite{enhancingcnn2024}.
 
 \subsection{Unified Optimisation Objective}
 
