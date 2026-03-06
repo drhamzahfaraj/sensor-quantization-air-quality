@@ -34,64 +34,18 @@
 \date{}
 \maketitle
 
+%% ============================================================
+%% ABSTRACT - UPDATED (Priority 1 - Corrected energy claims)
+%% ============================================================
 \input{sections/abstract}
 
 %% ============================================================
-%% SECTION 1: INTRODUCTION  (Updated with global framing)
+%% SECTION 1: INTRODUCTION - UPDATED (Priority 1)
 %% ============================================================
-\section{Introduction}
-\label{sec:introduction}
-
-\subsection{Motivation and Context}
-\label{sec:intro_motivation}
-
-Indoor air pollution is a leading environmental health risk, contributing to approximately 3.2 million premature deaths annually according to the World Health Organisation. Continuous monitoring of indoor pollutants---including fine particulate matter (PM$_{2.5}$), coarse particulate matter (PM$_{10}$), carbon dioxide (CO$_2$), volatile organic compounds (VOCs), carbon monoxide (CO), and nitrogen dioxide (NO$_2$)---has consequently become a pressing public health priority~\cite{karmakar2024exploring}. The rapid proliferation of low-cost Internet of Things (IoT) sensor platforms in recent years has enabled fine-grained spatio-temporal characterisation of indoor air quality (IAQ) at unprecedented scale~\cite{dimitriou2025innovations,enviroiot2025}. Deployments now span residential dwellings, commercial buildings, schools, and hospitals across diverse geographic and socioeconomic contexts, providing real-time data streams that inform occupant behaviour, ventilation control, and regulatory compliance.
-
-However, these monitoring systems face a fundamental and largely unresolved tension between data fidelity and energy sustainability~\cite{energysustainable2023}. Increasing the sampling rate or the analogue-to-digital converter (ADC) resolution improves the accuracy with which pollutant dynamics are captured, yet each increment raises power draw at the sensor, enlarges data volume for wireless transmission, and adds computational load for on-device inference. In battery-powered deployments, this tension directly limits operational lifetime. In mains-powered multi-node buildings, it determines the aggregate electricity cost and carbon footprint of the monitoring infrastructure.
-
-Edge devices deployed for IAQ monitoring are typically built around resource-constrained microcontrollers. The ESP32, one of the most widely adopted platforms for environmental IoT, consumes approximately 45.5~mA in active mode and 5.27~mA in light-sleep mode when powered at 5~V~\cite{esp32power2025}. Deep-sleep current drops to 0.05~mA, enabling battery lifetimes exceeding 48 months under intermittent duty cycling~\cite{benchmarking2022}. Nevertheless, continuous 1~Hz multi-channel monitoring demands sustained active-mode operation, rapidly depleting energy budgets. The ADC subsystem contributes materially to this overhead. Its power consumption scales exponentially with bit resolution according to the Walden figure of merit (FoM), where state-of-the-art successive-approximation-register (SAR) ADCs achieve energy efficiencies ranging from 0.44~fJ per conversion step at 11-bit resolution to 16.6~fJ per conversion step at 8-bit resolution in advanced process nodes~\cite{waldenADC2018,andrulis2024adc}. This exponential relationship implies that even modest reductions in effective resolution yield substantial energy savings at the sensing stage.
-
-Simultaneously, neural network inference on edge devices imposes additional energy demands. A single forward pass through a floating-point convolutional neural network (CNN) involves millions of multiply-accumulate (MAC) operations, each consuming 3.7~pJ in 32-bit floating point (FP32) on typical 45~nm hardware~\cite{guo2020fixedpoint}. For continuously operating monitoring systems that perform classification or anomaly detection at regular intervals, inference energy can rival or exceed sensing energy over a 24-hour duty cycle. The need to minimise both sensing and inference energy without sacrificing monitoring quality motivates the work presented in this paper.
-
-\subsection{Problem Statement}
-\label{sec:intro_problem}
-
-Neural network quantisation has emerged as a powerful technique for reducing inference energy on edge hardware. Post-training quantisation (PTQ) compresses trained model weights and activations from 32-bit floating point to lower numerical precision---typically 8-bit integers (INT8)---without requiring expensive retraining~\cite{nagel2021whitepaper,quantsurvey2021}. Recent PTQ advances have demonstrated remarkable efficiency gains. Xiao et al.~(2024) introduced SmoothQuant, a training-free method that achieves W8A8 (8-bit weights and activations) quantisation through mathematically equivalent activation-weight smoothing, preserving accuracy within 1\% of the full-precision baseline~\cite{smoothquant2024}. Palakodety et al.~(2025) demonstrated INT8 PTQ on a RISC-V neural processing unit, achieving 14.5$\times$ inference speedup at only 1.96~W average power~\cite{palakodety2025tpu}. At even lower precision, fixed-point designs at 4-bit width maintain 99.28\% relative accuracy with less than 0.3\% degradation~\cite{guo2020fixedpoint}. These results confirm that inference-level quantisation is mature and effective for edge deployment.
-
-At the sensor level, a parallel body of work has pursued data reduction prior to wireless transmission. Adaptive thresholding mechanisms suppress redundant readings when signal variation falls below a tolerance band~\cite{atitallah2023autonomous}. Bounded-error pruning selectively discards measurements within a configurable error envelope, achieving compression proportional to signal stationarity~\cite{azar2020bounded}. Symbolic Aggregate approXimation with Lempel-Ziv-Welch compression (SAX-LZW)~\cite{aljanabi2022sax} discretises continuous signals into symbolic representations before applying dictionary-based encoding. Reinforcement-learning-based approaches have also appeared: Pratama et al.~(2025) employed Q-learning to optimise transmission scheduling for ESP32-based air quality nodes, reducing transmission frequency by 40--50\%~\cite{qlearning2025airquality}. In the adjacent domain of neural recording, Pandey et al.~(2025) demonstrated machine-learning-guided ADC resolution reconfiguration, achieving 8.7--23$\times$ power savings by dynamically adjusting per-channel bit-width based on decoder importance scores~\cite{pandey2025neural}. This concept of adaptive per-channel precision control has not yet been applied to environmental IoT monitoring.
-
-Despite these advances in both domains, a critical disconnect persists: sensor-level compression and inference-level quantisation have been treated as independent optimisation problems. Sensor data reduction methods operate on raw signals without awareness of the downstream inference model. Model compression techniques---whether PTQ~\cite{smoothquant2024,qdrop2023}, quantisation-aware training (QAT)~\cite{edgeqat2024,efficientqat2024}, or mixed-precision quantisation~\cite{dong2024efficient,dybit2023}---optimise the neural network in isolation from the sensing pipeline. This separation leaves significant compound energy savings unrealised. A lower sensor bit-width reduces not only ADC energy but also data transmission volume and the dynamic range presented to the inference model. Conversely, knowledge of inference model sensitivity to input precision could inform optimal sensor-level bit allocation. No existing framework exploits this bidirectional dependency.
-
-The research gap can be stated concisely. There is no unified optimisation framework that jointly determines sensor-level ADC resolution and inference-level model precision for energy-efficient environmental IoT monitoring. Existing methods address one domain or the other but never both simultaneously, and none leverage the inherent temporal structure of indoor pollutant signals---long stable periods interspersed with activity-driven transients---to guide adaptive bit-width allocation across both the sensing and inference stages.
-
-\subsection{Contributions}
-\label{sec:intro_contributions}
-
-This paper addresses the identified gap through the following four contributions:
-
-\begin{enumerate}[leftmargin=*]
-    \item \textbf{Variance-Aware Adaptive Bit-Width Quantisation (VABQ) framework.} A dual-layer optimisation pipeline is proposed that unifies sensor-level ADC resolution control (Stage~1) with inference-level INT8 post-training quantisation (Stage~2) under a shared variance-entropy criterion. VABQ operates per-channel and per-time-step, adapting bit-width dynamically to signal characteristics without inter-node communication.
-
-    \item \textbf{Variance-entropy criterion for adaptive bit allocation.} A composite decision metric is introduced that combines rolling signal variance with normalised Shannon entropy to classify each 10-minute measurement window into low-activity (4-bit), moderate-activity (8-bit), or high-activity (16-bit) regimes. This criterion advances beyond the heuristic, single-statistic thresholds used in prior adaptive sampling~\cite{atitallah2023autonomous} and the decoder-importance scores used in neural resolution reconfiguration~\cite{pandey2025neural}, providing a principled information-theoretic basis for per-channel precision control.
-
-    \item \textbf{Comprehensive experimental validation on the DALTON dataset.} The framework is evaluated on the DALTON indoor air quality dataset~\cite{karmakar2024exploring,karmakar2024indoor,karmakar2024neurips}, which spans 30 deployment sites in low- to middle-income communities, 46 occupants, and six months of continuous multi-channel data sampled at 1~Hz. This real-world, multi-site, multi-season dataset from developing-country contexts provides substantially stronger evidence than the simulation-based evaluations common in the sensor compression literature. Results demonstrate 61.3\% sensor-level energy reduction, 74.8\% inference-level energy reduction, and 64.6\% total system energy reduction, while maintaining classification accuracy above 96.1\% and normalised root-mean-square error (NRMSE) below 2.4\%.
-
-    \item \textbf{Comparative analysis against four baselines and existing literature.} A systematic comparison is conducted against uniform 16-bit sensing with FP32 inference, inference-only INT8 PTQ, static 8-bit sensor reduction, and fixed-threshold adaptive sampling. Additionally, VABQ is contextualised against eight published methods spanning sensor compression~\cite{atitallah2023autonomous,azar2020bounded,aljanabi2022sax}, neural network quantisation~\cite{smoothquant2024,edgempq2024}, and edge AI for air quality~\cite{akhyar2025tinyml,qlearning2025airquality,pandey2025neural}. The comparative study confirms that joint optimisation yields compound savings exceeding the sum of individual approaches.
-\end{enumerate}
-
-The principal novelty of this work lies in bridging two traditionally separate compression domains---sensor data reduction and neural network quantisation---into a unified, mathematically grounded framework. By exploiting the temporal periodicity of indoor pollutant signals at both the sensing and inference levels, VABQ achieves energy savings that are not merely additive: sensor-level bit reduction decreases data volume, which in turn reduces both transmission energy and the effective dynamic range presented to the inference model, thereby improving the accuracy-efficiency trade-off of PTQ. This synergistic interaction between the two stages distinguishes the proposed approach from sequential application of independent techniques.
-
-\subsection{Paper Organisation}
-\label{sec:intro_organisation}
-
-The remainder of this paper is organised as follows. Section~\ref{sec:related_work} provides a comprehensive review of related work across five domains---IoT-based air quality monitoring, sensor data reduction, neural network quantisation, edge AI for environmental sensing, and ADC energy modelling---and synthesises the research gap motivating this study. Section~\ref{sec:methodology} presents the VABQ framework in detail, covering the system architecture, the variance-aware sensor quantisation stage (Stage~1), the inference-level PTQ stage (Stage~2), and the unified optimisation objective with its mathematical formulation. Section~\ref{sec:experiments} describes the experimental setup, including the DALTON dataset, data partitioning strategy, baseline configurations, evaluation metrics, and implementation details. Section~\ref{sec:results} reports quantitative results across signal fidelity, classification accuracy, energy consumption, and sensitivity analyses. Section~\ref{sec:discussion} interprets the results, discusses practical deployment implications, justifies the novelty of the contribution, addresses generalisability and scalability, and acknowledges limitations with directions for future research. Section~\ref{sec:conclusion} concludes the paper with a summary of findings and a research outlook.
+\input{sections/sec1_introduction}
 
 %% ============================================================
-%% END OF SECTION 1
-%% ============================================================
-
-%% ============================================================
-%% SECTION 2: RELATED WORK  (Updated with global framing)
+%% SECTION 2: RELATED WORK
 %% ============================================================
 \section{Related Work}
 \label{sec:related_work}
@@ -191,258 +145,30 @@ No prior work jointly optimises sensor-level ADC bit-width and inference-level m
 The VABQ framework addresses this gap through a variance-entropy criterion that governs both sensing and inference quantisation within a unified, mathematically grounded pipeline. By exploiting the temporal structure of IAQ signals at both layers, VABQ achieves compound energy savings that exceed the sum of independent sensor-level and inference-level optimisation. This synergy---where sensor bit reduction improves PTQ effectiveness by narrowing the dynamic range---is the key insight distinguishing the proposed approach from sequential application of existing techniques.
 
 %% ============================================================
-%% END OF SECTION 2
+%% SECTION 3: METHODOLOGY
 %% ============================================================
-
-%% ============================================================
-%% SECTION 3: METHODOLOGY  (No changes needed - already general)
-%% ============================================================
-\section{Methodology}
-\label{sec:methodology}
-
-This section presents the VABQ framework in four parts: system overview, sensor-level adaptive quantisation (Stage~1), inference-level PTQ (Stage~2), and the unified optimisation objective.
-
-\subsection{System Overview}
-\label{sec:meth_overview}
-
-The VABQ pipeline operates in two stages executed on a single ESP32 microcontroller. Stage~1 operates at the ADC of each sensor channel, computing rolling variance and entropy to determine per-channel bit-width allocation (4, 8, or 16 bits). Stage~2 applies INT8 PTQ to a lightweight 1D-CNN deployed on the same microcontroller for pollutant event classification. Both stages are governed by a shared variance-entropy criterion that exploits the temporal structure of indoor air quality signals.
-
-The design rationale is twofold. First, indoor pollutant signals exhibit strong temporal structure: long stable periods during nighttime or unoccupied intervals interspersed with sharp, activity-driven transients during cooking, cleaning, or ventilation changes~\cite{karmakar2024exploring,karmakar2024indoor}. During stable periods, low-resolution sampling captures all relevant information; during transients, full resolution preserves critical features for accurate event classification. Second, model inference dominates computational energy on edge devices; PTQ to INT8 provides the optimal accuracy-efficiency trade-off for lightweight CNNs~\cite{enhancingcnn2024,palakodety2025tpu}. By jointly optimising both stages, VABQ achieves compound energy savings that exceed the sum of independent optimisation at each layer.
-
-\subsection{Stage 1: Variance-Aware Sensor Quantisation}
-\label{sec:meth_stage1}
-
-\subsubsection{Rolling Variance Computation}
-
-For each sensor channel $c \in \{\text{PM}_{2.5}, \text{PM}_{10}, \text{CO}_2, \text{VOC}, \text{CO}, \text{NO}_2, T, \text{RH}\}$, the rolling variance over a sliding window of $\tau = 600$ samples---corresponding to 10 minutes at 1~Hz sampling, consistent with the DALTON Healthy Home Index window~\cite{karmakar2024exploring}---is computed as:
-\begin{equation}
-    \sigma_c^2(t) = \frac{1}{\tau} \sum_{i=t-\tau+1}^{t} \left( x_c(i) - \bar{x}_c(t) \right)^2
-    \label{eq:variance}
-\end{equation}
-where $x_c(i)$ is the raw sensor reading at time $i$ and $\bar{x}_c(t) = \frac{1}{\tau} \sum_{i=t-\tau+1}^{t} x_c(i)$ is the rolling mean. In practice, Equation~(\ref{eq:variance}) is computed incrementally using Welford's online algorithm~\cite{atitallah2023autonomous}, which requires only three scalar accumulators per channel: sample count $n$, running mean $\bar{x}$, and running sum of squared deviations $M_2$. The per-sample update has $O(1)$ time complexity and $O(1)$ memory footprint, making it suitable for resource-constrained microcontrollers.
-
-\subsubsection{Signal Entropy Estimation}
-
-To complement variance with information-theoretic content, the normalised Shannon entropy of the quantised signal within the window is computed as:
-\begin{equation}
-    H_c(t) = -\sum_{k=1}^{K} p_k \log_2 p_k
-    \label{eq:entropy}
-\end{equation}
-where $p_k$ is the empirical probability of the $k$-th quantisation level and $K$ is the number of distinct levels observed. For a 16-bit sensor with full-scale range discretised into 256 bins, $K \leq 256$. Entropy distinguishes genuinely varying signals (high entropy, many levels occupied) from noisy-but-static signals (low entropy, few levels), providing a complementary measure to variance. A static signal with Gaussian noise exhibits high variance but low entropy, whereas a signal undergoing a genuine transition exhibits both high variance and high entropy.
-
-\subsubsection{Variance-Entropy Criterion and Bit-Width Assignment}
-
-The composite decision metric combines normalised variance and entropy:
-\begin{equation}
-    \Gamma_c(t) = \alpha \cdot \frac{\sigma_c^2(t)}{\sigma_{c,\max}^2} + (1 - \alpha) \cdot \frac{H_c(t)}{H_{c,\max}}
-    \label{eq:gamma}
-\end{equation}
-where $\sigma_{c,\max}^2$ and $H_{c,\max}$ are channel-specific normalisation constants computed from a calibration subset (the first week of deployment for each site), and $\alpha \in [0, 1]$ weights the two components. Grid search on the calibration data yields $\alpha = 0.65$ as optimal, indicating that variance contributes slightly more discriminative power than entropy for IAQ signals.
-
-Bit-width assignment follows a three-tier rule:
-\begin{equation}
-    b_c(t) = \begin{cases}
-        4 & \text{if } \Gamma_c(t) < \theta_L \\
-        8 & \text{if } \theta_L \leq \Gamma_c(t) < \theta_H \\
-        16 & \text{if } \Gamma_c(t) \geq \theta_H
-    \end{cases}
-    \label{eq:bitwidth}
-\end{equation}
-where $\theta_L = 0.15$ and $\theta_H = 0.55$ are determined by minimising the Lagrangian:
-\begin{equation}
-    \mathcal{L}(\theta_L, \theta_H) = \lambda_E \cdot E_{\text{ADC}}(\theta_L, \theta_H) + \lambda_D \cdot D(\theta_L, \theta_H)
-    \label{eq:lagrangian}
-\end{equation}
-with $E_{\text{ADC}}$ denoting time-averaged ADC energy, $D$ denoting signal reconstruction root-mean-square error (RMSE), and Lagrange multipliers $\lambda_E = 1.0$, $\lambda_D = 400$ set to enforce a target reconstruction error of 2.5\% of the full-scale range. This constraint ensures that sensor-level compression does not degrade signal fidelity below the tolerance required for accurate downstream inference.
-
-\subsubsection{ADC Energy Model}
-
-Instantaneous ADC power for channel $c$ at time $t$ follows the Walden figure of merit~\cite{waldenADC2018,andrulis2024adc}:
-\begin{equation}
-    P_c(t) = \text{FoM}_W \cdot 2^{b_c(t)} \cdot f_s
-    \label{eq:adcpower}
-\end{equation}
-with $\text{FoM}_W = 10$~fJ per conversion step (representative of ESP32-class 12-bit SAR ADCs) and $f_s = 1$~Hz. Total sensor energy over period $T$ across $C = 8$ channels is:
-\begin{equation}
-    E_{\text{sensor}} = \sum_{c=1}^{C} \sum_{t=1}^{T} P_c(t) \cdot \Delta t
-    \label{eq:sensorenergy}
-\end{equation}
-The energy saving relative to a uniform 16-bit baseline is:
-\begin{equation}
-    \Delta E_{\text{sensor}} = 1 - \frac{E_{\text{sensor}}^{\text{VABQ}}}{E_{\text{sensor}}^{\text{16-bit}}}
-    \label{eq:sensorsaving}
-\end{equation}
-Conceptually, reducing bit-width from 16 to 4 bits reduces per-sample ADC energy by a factor of $2^{16-4} = 4096$ in the idealised Walden model. In practice, fixed overhead circuitry (reference buffers, clock distribution, comparator bias) moderates this to approximately 15$\times$~\cite{andrulis2024adc,reconfigADC2025}. This exponential dependence on bit-width is the principal mechanism driving sensor-level energy savings.
-
-\subsection{Stage 2: Inference-Level Post-Training Quantisation}
-\label{sec:meth_stage2}
-
-\subsubsection{Lightweight 1D-CNN Architecture}
-
-A compact 1D-CNN is designed for eight-class pollutant event classification. The architecture consists of three convolutional blocks, each containing: a 1D convolution (kernel size 5), batch normalisation, ReLU activation, and max pooling (stride 2). Filter counts are 16, 32, and 64 respectively. A global average pooling layer feeds a classifier head with a 64-unit dense layer, dropout (rate 0.3), and an 8-way softmax output. Input dimensions are $(600 \times 8)$, corresponding to 10-minute windows of 8 sensor channels.
-
-The model contains approximately 45,000 parameters, yielding a memory footprint of 176~KB in FP32 and 44~KB in INT8---well within the ESP32's 520~KB SRAM~\cite{esp32power2025}. This shallow, narrow architecture ensures real-time inference at 0.1~Hz (one classification per 10-minute window), consistent with TinyML deployment principles~\cite{akhyar2025tinyml,tinytrain2024}.
-
-Training uses FP32 precision on the first two months of the DALTON dataset (training split) with the Adam optimiser (learning rate $10^{-3}$, batch size 64, 50 epochs) and categorical cross-entropy loss. The eight target classes---cooking, cleaning, sleeping, ventilation change, idle, electronic device use, eating/dining, and other---are annotated by the occupants via the VocalAnnot smartphone application~\cite{karmakar2024exploring,karmakar2024indoor}.
-
-\subsubsection{Post-Training Quantisation Procedure}
-
-INT8 PTQ is applied using min-max calibration on a held-out calibration set (10\% of the training data). For layer $l$, the quantisation function maps floating-point values to 8-bit unsigned integers~\cite{nagel2021whitepaper,quantsurvey2021}:
-\begin{equation}
-    x_q = \text{clip}\left(\left\lfloor \frac{x - x_{\min}^{(l)}}{s_l} \right\rceil, \; 0, \; 255\right)
-    \label{eq:ptq}
-\end{equation}
-where $s_l = (x_{\max}^{(l)} - x_{\min}^{(l)}) / 255$ is the per-layer scale factor, $x_{\min}^{(l)}$ and $x_{\max}^{(l)}$ are the minimum and maximum activations observed during calibration, and $\lfloor \cdot \rceil$ denotes round-to-nearest integer. This standard asymmetric uniform quantisation is selected over more complex approaches (QDrop~\cite{qdrop2023}, SmoothQuant~\cite{smoothquant2024}) for its simplicity and full compatibility with TensorFlow Lite for Microcontrollers on the ESP32.
-
-\subsubsection{Inference Energy Model}
-
-Inference energy per forward pass is:
-\begin{equation}
-    E_{\text{infer}} = \sum_{l=1}^{L} N_l^{\text{MAC}} \cdot e_{b_l}
-    \label{eq:inferenergy}
-\end{equation}
-where $N_l^{\text{MAC}}$ is the multiply-accumulate operation count in layer $l$ and $e_{b_l}$ is energy per MAC at bit-width $b_l$. Using established hardware measurements~\cite{guo2020fixedpoint,vsquant2021}: $e_{32} = 3.7$~pJ (FP32), $e_{16} = 0.9$~pJ (FP16), $e_8 = 0.2$~pJ (INT8). The per-MAC energy reduction from FP32 to INT8 is:
-\begin{equation}
-    \Delta E_{\text{MAC}} = 1 - \frac{e_8}{e_{32}} = 1 - \frac{0.2}{3.7} \approx 94.6\%
-    \label{eq:macsaving}
-\end{equation}
-Including memory access overhead (which scales linearly with bit-width due to reduced data movement) and control logic (which is bit-width independent), the effective system-level inference energy reduction is approximately 74.8\% relative to FP32 baseline~\cite{enhancingcnn2024,edgempq2024}.
-
-\subsection{Unified Optimisation Objective}
-\label{sec:meth_unified}
-
-Total system energy per inference window (10 minutes) is:
-\begin{equation}
-    E_{\text{total}} = E_{\text{sensor}} + E_{\text{tx}} + E_{\text{infer}} + E_{\text{idle}}
-    \label{eq:totalenergy}
-\end{equation}
-where $E_{\text{sensor}}$ is ADC energy from Equation~(\ref{eq:sensorenergy}), $E_{\text{tx}}$ is wireless transmission energy (proportional to data volume, hence to mean bit-width), $E_{\text{infer}}$ is inference energy from Equation~(\ref{eq:inferenergy}), and $E_{\text{idle}}$ is baseline platform consumption (CPU, memory controller, peripherals). For the ESP32 in active mode at 5~V and 45.5~mA, $E_{\text{idle}} = 5 \times 0.0455 \times 600 = 136.5$~J per window~\cite{esp32power2025}.
-
-VABQ minimises $E_{\text{total}}$ subject to quality constraints:
-\begin{equation}
-    \min_{\theta_L, \theta_H, \alpha} \; E_{\text{total}}(\theta_L, \theta_H, \alpha) \quad \text{s.t.} \quad A \geq 0.95, \; D \leq 0.025 \cdot R_{\text{FS}}
-    \label{eq:optimization}
-\end{equation}
-where $A$ is classification accuracy, $D$ is reconstruction RMSE, and $R_{\text{FS}}$ is full-scale sensor range. The three hyperparameters ($\theta_L = 0.15$, $\theta_H = 0.55$, $\alpha = 0.65$) are optimised via grid search on the calibration subset (first week of each deployment site), requiring fewer than 2,000 evaluations and completing in under 10 minutes on the ESP32. Once determined, these hyperparameters remain fixed for the remainder of the deployment, ensuring zero reconfiguration overhead at runtime.
-
-Algorithm~\ref{alg:vabq} summarises the VABQ procedure at runtime.
-
-\begin{algorithm}[H]
-\SetAlgoLined
-\KwIn{Sensor readings $\{x_c(t)\}_{c=1}^{8}$, thresholds $\theta_L$, $\theta_H$, weight $\alpha$, window size $\tau = 600$}
-\KwOut{Per-channel bit-widths $\{b_c(t)\}_{c=1}^{8}$, event classification $\hat{y}(t)$}
-\For{each time step $t = 1, 2, \ldots$}{
-    \For{each channel $c = 1, \ldots, 8$}{
-        Update rolling mean $\bar{x}_c(t)$ and variance $\sigma_c^2(t)$ via Welford's algorithm\;
-        Update histogram and compute entropy $H_c(t)$ via Equation~(\ref{eq:entropy})\;
-        Compute composite criterion $\Gamma_c(t)$ via Equation~(\ref{eq:gamma})\;
-        Assign bit-width $b_c(t)$ via Equation~(\ref{eq:bitwidth})\;
-        Sample sensor $c$ at $b_c(t)$-bit resolution\;
-    }
-    \If{$t \bmod \tau = 0$}{
-        Construct input tensor of shape $(\tau \times 8)$ from past $\tau$ samples\;
-        Run INT8 1D-CNN forward pass via TensorFlow Lite for Microcontrollers\;
-        Output event classification $\hat{y}(t) \in \{1, \ldots, 8\}$\;
-    }
-}
-\caption{VABQ Runtime Procedure}
-\label{alg:vabq}
-\end{algorithm}
-
-The algorithm operates in two nested loops. The outer loop iterates over time at 1~Hz. The inner loop updates variance, entropy, and bit-width for each of the eight sensor channels. Every 600 seconds (10 minutes), the accumulated sensor data is fed to the INT8 1D-CNN for event classification. The per-sample overhead is dominated by the Welford update and histogram maintenance, requiring approximately 50~$\mu$s per channel on the ESP32, well within the 1-second sampling interval.
+\input{sections/sec3_methodology}
 
 %% ============================================================
-%% END OF SECTION 3
+%% SECTION 4: EXPERIMENTAL SETUP
 %% ============================================================
-
-%% ============================================================
-%% SECTION 4: EXPERIMENTAL SETUP  (Updated with global framing)
-%% ============================================================
-\section{Experimental Setup}
-\label{sec:experiments}
-
-This section describes the DALTON dataset, data partitioning strategy, baseline configurations, evaluation metrics, and implementation details that support the empirical validation of VABQ.
-
-\subsection{The DALTON Dataset}
-\label{sec:exp_dataset}
-
-Experiments use the DALTON indoor air quality dataset, which was collected over six months (April--September 2023) across 30 deployment sites in low- to middle-income communities spanning four geographical regions~\cite{karmakar2024exploring,karmakar2024indoor,karmakar2024neurips}. The dataset was accepted at the NeurIPS 2024 Datasets and Benchmarks Track, reflecting its quality and comprehensiveness. Sites comprise residential households (39.3\%), studio apartments (28.6\%), research laboratories (17.9\%), food canteens (7.1\%), and classrooms (7.1\%). Site floor areas range from 150 to 1,100 square feet, with 1--6 sensor nodes per site. A total of 46 occupants participated, with 42 actively annotating activities via the VocalAnnot smartphone application.
-
-The DALTON sensor node is built on the ESP-WROOM-32 microcontroller (dual-core Xtensa LX6, 80--240~MHz adjustable clock, 448~KB ROM, 520~KB SRAM, Wi-Fi 2.4~GHz). It integrates six environmental sensors measuring eight pollutant-related channels at 1~Hz sampling rate:
-\begin{itemize}[leftmargin=*]
-    \item \textbf{Particulate Matter:} DUST sensor (SHARP GP2Y1014AU0F) measures PM$_1$, PM$_{2.5}$, and PM$_{10}$ in the range 0--500~$\mu$g/m$^3$ with measurement error $\pm 10$~$\mu$g/m$^3$.
-    \item \textbf{Carbon Dioxide:} MH-Z16 NDIR (non-dispersive infrared) sensor measures CO$_2$ in the range 0--10,000~ppm with measurement error $\pm 100$~ppm $+$ 6\% of reading.
-    \item \textbf{Gases:} Multi-Channel Gas Sensor (MCGS) measures NO$_2$ (0.1--10~ppm), VOC expressed as ethanol equivalent (1--500~ppm), and CO (5--5,000~ppm).
-    \item \textbf{Comfort Variables:} DHT22 sensor measures temperature ($\pm 0.5$°C accuracy) and relative humidity ($\pm 2$\% accuracy).
-\end{itemize}
-
-The dataset contains 89.1 million sensor samples and 3,957 activity annotations from 24 active participants. Annotations are timestamped and tagged with one of eight event types: cooking, cleaning, sleeping, ventilation change, idle, electronic device use, eating/dining, and other. This comprehensive annotation enables supervised learning for pollutant event classification, a key application for edge AI-based IAQ monitoring across diverse indoor environments globally.
-
-\subsection{Data Partitioning Strategy}
-\label{sec:exp_partition}
-
-The six-month dataset is partitioned chronologically into training (months 1--2, 60 days), validation (month 3, 30 days), calibration (first week of month 1, 7 days), and test (months 4--6, 90 days) subsets. This temporal split ensures that the model is evaluated on genuinely unseen future data, mimicking real-world deployment scenarios where training occurs once during initial commissioning and inference operates continuously thereafter without retraining.
-
-The calibration subset is used exclusively to determine VABQ hyperparameters ($\theta_L$, $\theta_H$, $\alpha$) via grid search. The training subset is used to train the 1D-CNN classifier in FP32 precision. The validation subset is used to select early-stopping epochs and perform min-max calibration for INT8 PTQ. The test subset---comprising 50\% of the total dataset and spanning three diverse months---is used for final performance evaluation.
-
-This partitioning strategy isolates hyperparameter tuning, model training, and performance assessment across distinct temporal intervals, preventing information leakage and ensuring robust evaluation of generalisation performance.
-
-\subsection{Baseline Configurations}
-\label{sec:exp_baselines}
-
-Four baseline configurations are evaluated to isolate the contributions of sensor-level and inference-level quantisation:
-
-\begin{enumerate}[leftmargin=*]
-    \item \textbf{Baseline 1 (Uniform-16bit + FP32):} All eight sensor channels sampled at uniform 16-bit resolution; inference performed in FP32 precision. This represents the high-fidelity, high-energy reference configuration.
-    
-    \item \textbf{Baseline 2 (Uniform-16bit + INT8):} All eight sensor channels sampled at uniform 16-bit resolution; inference performed in INT8 precision via PTQ. This isolates the effect of inference-level quantisation alone.
-    
-    \item \textbf{Baseline 3 (Static-8bit + FP32):} All eight sensor channels sampled at uniform 8-bit resolution; inference performed in FP32 precision. This isolates the effect of static sensor-level quantisation alone.
-    
-    \item \textbf{Baseline 4 (Adaptive-16/8bit + FP32):} Sensor channels adaptively switch between 16-bit and 8-bit resolution using a fixed variance threshold (median of $\Gamma_c$ distribution); inference performed in FP32 precision. This represents a simplified adaptive sampling approach without entropy weighting or inference quantisation.
-\end{enumerate}
-
-The proposed VABQ framework (Adaptive-16/8/4bit + INT8) is evaluated against these four baselines to demonstrate the compound energy savings achieved through joint sensor-inference optimisation.
-
-\subsection{Evaluation Metrics}
-\label{sec:exp_metrics}
-
-Performance is assessed across four dimensions:
-
-\paragraph{Signal Fidelity.} Normalised root-mean-square error (NRMSE) quantifies reconstruction error between the quantised-dequantised signal and the original 16-bit reference:
-\begin{equation}
-    \text{NRMSE}_c = \frac{\sqrt{\frac{1}{T}\sum_{t=1}^{T}(x_c(t) - \hat{x}_c(t))^2}}{x_{c,\max} - x_{c,\min}}
-    \label{eq:nrmse}
-\end{equation}
-where $\hat{x}_c(t)$ is the reconstructed signal after quantisation-dequantisation and $x_{c,\max}$, $x_{c,\min}$ define the full-scale range of channel $c$.
-
-\paragraph{Classification Accuracy.} Top-1 accuracy for the eight-class pollutant event classification task:
-\begin{equation}
-    \text{Accuracy} = \frac{1}{N}\sum_{i=1}^{N} \mathbbm{1}[\hat{y}_i = y_i]
-    \label{eq:accuracy}
-\end{equation}
-where $\mathbbm{1}[\cdot]$ is the indicator function, $\hat{y}_i$ is the predicted class, and $y_i$ is the ground-truth class for sample $i$.
-
-\paragraph{Energy Consumption.} Total system energy per 10-minute inference window, decomposed into sensor energy (ADC), transmission energy (wireless), inference energy (CNN forward pass), and idle energy (platform overhead). Energy is computed using the models in Equations~(\ref{eq:adcpower}), (\ref{eq:inferenergy}), and hardware datasheets for the ESP32 platform.
-
-\paragraph{Bit-Width Distribution.} Empirical distribution of allocated bit-widths across channels and time, providing insights into the adaptability of the VABQ framework to temporal signal dynamics.
-
-\subsection{Implementation Details}
-\label{sec:exp_implementation}
-
-The 1D-CNN classifier is implemented in TensorFlow 2.15 and trained on a workstation with an NVIDIA RTX 3090 GPU. After training in FP32 precision, the model is converted to INT8 via TensorFlow Lite post-training quantisation with representative calibration data from the validation subset. The quantised TFLite model is deployed on the ESP32 using TensorFlow Lite for Microcontrollers (TFLM) version 2.15.
-
-Sensor-level quantisation is simulated by rounding FP32 sensor readings to the allocated bit-width and reconstructing via min-max dequantisation. This simulation accurately reflects the quantisation error introduced by reduced ADC resolution while enabling controlled experimentation on the recorded dataset. In a physical deployment, the ESP32's 12-bit SAR ADC would be reconfigured dynamically via register writes to the ADC controller, adjusting the effective number of bits (ENOB) per sample.
-
-All experiments are executed on the test subset (90 days, 7.78 million samples per channel). Energy calculations use established hardware parameters: ESP32 active power 227.5~mW (45.5~mA @ 5~V), FP32 MAC energy 3.7~pJ, INT8 MAC energy 0.2~pJ, and Walden FoM 10~fJ per conversion step for the SAR ADC. Transmission energy is computed assuming LoRaWAN modulation with 125~kHz bandwidth at spreading factor 7, yielding 0.5~mJ per byte transmitted.
+\input{sections/sec4_experiments}
 
 %% ============================================================
-%% END OF SECTION 4
+%% SECTION 5: RESULTS - WILL INCLUDE sec5_results.tex
+%% NOTE: Section 5.4 needs to be manually added to sec5_results.tex
 %% ============================================================
+\input{sections/sec5_results}
 
-\input{sections/results}
-\input{sections/discussion}
-\input{sections/conclusion}
+%% ============================================================
+%% SECTION 6: DISCUSSION
+%% ============================================================
+\input{sections/sec6_discussion}
+
+%% ============================================================
+%% SECTION 7: CONCLUSION - UPDATED (Priority 1)
+%% ============================================================
+\input{sections/sec7_conclusion}
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
