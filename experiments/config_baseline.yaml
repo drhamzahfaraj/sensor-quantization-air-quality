@@ -1,0 +1,25 @@
+# config_baseline.yaml
+# Full-precision (FP32) baseline configuration — Fixed-16 / teacher model
+
+data_dir: data/processed
+model_dir: src/models
+output_dir: results/baseline
+
+# Model
+n_channels: 8
+n_classes: 8
+
+# Training
+seeds: [42, 43, 44, 45, 46]
+epochs: 50
+batch_size: 64
+lr: 0.001
+weight_decay: 0.0001
+
+# No quantisation
+sensor_bits: 16  # fixed 16-bit ADC
+inference_precision: fp32
+
+# Evaluation
+window_size: 600  # 10-minute window at 1 Hz
+stride: 60  # 1-minute stride for windowing
