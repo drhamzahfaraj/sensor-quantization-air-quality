@@ -1,0 +1,8 @@
+configuration,description,accuracy_pct,nrmse_pct,mean_bits,energy_j,notes
+variance_only,Alpha=1.0 (variance criterion only),94.3,2.45,7.82,147.35,Misclassifies noisy-but-stationary signals
+entropy_only,Alpha=0.0 (entropy criterion only),93.8,2.68,8.13,148.92,Under-responds to magnitude changes
+fixed_thresholds,No adaptation (uniform 8-bit),95.2,2.89,8.00,149.61,Static thresholds across all channels
+no_spike_detection,AQSC without intra-window spike boost,95.4,2.31,7.61,146.80,F1 drops from 97.8% to 94.1% for cooking events
+no_channel_state,AQSC without SNR-aware floor,96.0,2.30,7.54,146.60,+2.6% energy when link quality degrades
+no_distillation,AQSC without knowledge distillation,95.8,2.29,7.54,145.28,Accuracy drops 0.3 pp vs full pipeline
+AQSC_full,Full AQSC pipeline,96.1,2.29,7.54,145.28,Best accuracy-energy trade-off
