@@ -1,0 +1,7 @@
+method,rmse,mae,r2,energy_uj,latency_ms,flash_kb,reference
+Fixed-16,1.71,1.18,0.947,481.3,12.4,61.2,"ma2023aqedge,chen2023tinyml"
+BRECQ-8,1.92,1.33,0.931,316.7,9.6,31.1,li2021brecq
+QAT-Mix,2.05,1.44,0.919,251.3,10.1,26.8,nagel2021whitepaper
+QLoRA-4b,2.48,1.81,0.897,228.4,13.8,18.3,hu2022lora
+Prune-50,1.79,1.24,0.940,378.4,11.7,30.6,frankle2019lottery
+AQSC (Ours),1.79,1.24,0.944,171.8,7.9,23.4,this_work
