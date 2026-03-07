@@ -1,0 +1,62 @@
+AQSC Dataset Sampling and Split Documentation
+=============================================
+
+Dataset: DALTON — Indoor Air Quality Dataset with Activities of Daily Living
+Source:  Karmakar et al., NeurIPS 2024 Datasets & Benchmarks Track
+         https://papers.nips.cc/paper_files/paper/2024/file/81e16e41f99fe4ab9c23a0e0da8eaab2-Paper-Datasets_and_Benchmarks_Track.pdf
+
+--- Collection Details ---
+Sites:          30 indoor deployment sites
+Regions:        4 geographic regions of India (North, South, East, West)
+Site types:     Residential households (39.3%), studio apartments (28.6%),
+                research laboratories (17.9%), food canteens (7.1%),
+                classrooms (7.1%)
+Duration:       6 months (summer + winter seasons)
+Sampling rate:  1 Hz (continuous)
+Total samples:  89.1 million (8 channels × 30 sites × ~6 months)
+Occupants:      46 total; 42 actively annotating via VocalAnnot app
+
+--- Sensor Channels ---
+PM2.5 / PM10:   DUST sensor,   range 0–500 µg/m³,    error ±10 µg/m³
+CO2:            MH-Z16 NDIR,   range 0–10,000 ppm,   error ±100 ppm + 6%
+NO2:            MCGS,          range 0.1–10 ppm
+VOC (ethanol):  MCGS,          range 1–500 ppm
+CO:             MCGS,          range 5–5,000 ppm
+Temperature:    DHT22,         range -40–80°C,        error ±0.5°C
+Humidity:       DHT22,         range 0–100% RH,       error ±2% RH
+
+--- Activity Labels (8 classes) ---
+0: Cooking
+1: Cleaning
+2: Sleeping
+3: Ventilation change (window open/close, fan, AC)
+4: Idle (no active occupant behaviour)
+5: Electronic device use
+6: Eating / dining
+7: Other
+
+--- Temporal Split (no future leakage) ---
+Training:       Months 1–3  (~44.6M samples per channel)
+  └─ Calibration subset: First 2,000 windows of Month 1
+     (used to compute σ²_max, H_max per channel and optimise θ_L, θ_H, α)
+Validation:     Month 4     (~14.9M samples per channel)
+Testing:        Months 5–6  (~29.6M samples per channel, WINTER season)
+  └─ Deliberate domain shift: winter occupancy patterns and
+     heating-driven CO2/humidity dynamics differ from summer training data
+
+--- Calibration Convergence ---
+Stage A (sensor bit-width):  converges at 500 windows
+Stage B (layer rank):        converges at 2,000 windows (default)
+One window = 600 seconds (10-minute DALTON HHI window)
+2,000 windows ≈ 167 station-days of data
+
+--- Hardware ---
+Sensor node:    ESP32-WROOM-32 (dual-core Xtensa LX6, 240 MHz, 520 KB SRAM)
+Benchmark MCU:  STM32L4R9 (Cortex-M4, 120 MHz, 640 KB SRAM, 2 MB Flash, 3.3V)
+Energy sensor:  INA219 current shunt (±2.3% accuracy, 100 Hz sampling)
+Connectivity:   WiFi 2.4 GHz (DALTON nodes); LoRaWAN SX1276 (STM32 benchmark)
+
+--- Reproducibility Notes ---
+All experiments use seeds {42, 43, 44, 45, 46}; results reported as mean ± std.
+Statistical significance: paired t-test, p < 0.05 (Bonferroni corrected for
+multiple comparisons across 30 test sites).
