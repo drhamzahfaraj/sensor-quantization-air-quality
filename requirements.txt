@@ -1,0 +1,36 @@
+# AQSC — Python Dependencies
+# Tested on Python 3.10+
+
+# Core ML
+torch>=2.1.0
+torchvision>=0.16.0
+tensorflow>=2.12.0          # for TFLite PTQ pipeline
+tensorflow-model-optimization>=0.7.5
+
+# Data processing
+numpy>=1.24.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+scipy>=1.11.0
+
+# OpenAQ / UNEP data access
+requests>=2.31.0
+openaq>=2.1.0
+
+# Quantisation utilities
+neural-compressor>=2.3.0    # Intel Neural Compressor (QAT/PTQ)
+onnx>=1.14.0
+onnxruntime>=1.16.0
+
+# Energy modelling
+pyserial>=3.5               # INA219 current sensor readout
+smbus2>=0.4.2               # I2C communication
+
+# Visualisation
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Experiment management
+pyyaml>=6.0
+tqdm>=4.65.0
+tensorboard>=2.13.0
