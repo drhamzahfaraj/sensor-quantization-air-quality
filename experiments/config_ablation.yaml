@@ -1,0 +1,79 @@
+# config_ablation.yaml
+# Ablation study configurations — isolates contribution of each AQSC component
+
+data_dir: data/processed
+model_dir: src/models
+output_dir: results/ablation
+
+n_channels: 8
+n_classes: 8
+seeds: [42, 43, 44, 45, 46]
+epochs: 50
+batch_size: 64
+lr: 0.001
+window_size: 600
+calibration_windows: 2000
+
+# Ablation runs — each entry overrides default AQSC settings
+runs:
+
+  - name: variance_only
+    description: "Alpha=1.0 (variance criterion only)"
+    alpha: 1.0
+    theta_low: 0.15
+    theta_high: 0.55
+    use_spike_detection: false
+    use_channel_state: false
+    inference_precision: int8
+
+  - name: entropy_only
+    description: "Alpha=0.0 (entropy criterion only)"
+    alpha: 0.0
+    theta_low: 0.15
+    theta_high: 0.55
+    use_spike_detection: false
+    use_channel_state: false
+    inference_precision: int8
+
+  - name: fixed_thresholds
+    description: "No adaptation (uniform 8-bit fixed)"
+    sensor_bits: 8
+    inference_precision: fp32
+
+  - name: no_spike_detection
+    description: "AQSC without intra-window spike detection"
+    alpha: 0.65
+    theta_low: 0.15
+    theta_high: 0.55
+    use_spike_detection: false
+    use_channel_state: true
+    inference_precision: int8
+
+  - name: no_channel_state
+    description: "AQSC without SNR-aware bit-width floor"
+    alpha: 0.65
+    theta_low: 0.15
+    theta_high: 0.55
+    use_spike_detection: true
+    use_channel_state: false
+    inference_precision: int8
+
+  - name: no_distillation
+    description: "AQSC without knowledge distillation"
+    alpha: 0.65
+    theta_low: 0.15
+    theta_high: 0.55
+    use_spike_detection: true
+    use_channel_state: true
+    use_distillation: false
+    inference_precision: int8
+
+  - name: AQSC_full
+    description: "Full AQSC pipeline (default)"
+    alpha: 0.65
+    theta_low: 0.15
+    theta_high: 0.55
+    use_spike_detection: true
+    use_channel_state: true
+    use_distillation: true
+    inference_precision: int8
