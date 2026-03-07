@@ -1,0 +1,6 @@
+region,n_sites,site_types,accuracy_pct,nrmse_pct,mean_bits,energy_saving_pct,notes
+North_India,9,"residential,laboratory",96.3,2.21,7.48,65.1,Highest variance signals due to cooking and open fires
+South_India,8,"residential,canteen",95.9,2.34,7.61,64.0,Higher humidity reduces entropy discrimination
+East_India,7,"residential,classroom",96.0,2.28,7.53,64.8,Moderate signal dynamics
+West_India,6,"studio,laboratory",96.2,2.23,7.50,64.9,Lower occupancy; more 4-bit allocation
+All_regions,30,"all",96.1,2.29,7.54,64.6,Aggregate (default reported result)
