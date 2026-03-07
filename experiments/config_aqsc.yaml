@@ -1,0 +1,43 @@
+# config_aqsc.yaml
+# Full AQSC pipeline configuration (Stage A + Stage B + knowledge distillation)
+
+data_dir: data/processed
+model_dir: src/models
+output_dir: results/aqsc
+
+# Model
+n_channels: 8
+n_classes: 8
+
+# Training
+seeds: [42, 43, 44, 45, 46]
+epochs: 50
+batch_size: 64
+lr: 0.001
+weight_decay: 0.0001
+
+# Stage A — Sensor-Level Adaptive Quantisation
+theta_low: 0.15      # lower bit-width threshold (4-bit/8-bit boundary)
+theta_high: 0.55     # upper bit-width threshold (8-bit/16-bit boundary)
+alpha: 0.65          # variance weight in composite criterion Γ_c(t)
+window_size: 600     # rolling window size in samples (10 minutes at 1 Hz)
+spike_threshold: 5.0 # sample-to-sample variance threshold for spike detection
+snr_floor_db: 15.0   # SNR threshold below which bit-width is floored at 8
+
+# Stage B — Inference-Level PTQ
+inference_precision: int8
+ptq_mode: minmax     # min-max calibration on calibration split
+calibration_windows: 2000  # number of calibration windows for PTQ
+
+# Knowledge Distillation (optional; improves accuracy by ~0.3 pp)
+use_distillation: true
+distill_temperature: 4.0
+distill_alpha: 0.3
+qat_epochs: 10
+qat_lr: 0.0001
+
+# Hardware target
+target_mcu: STM32L4R9
+mcu_freq_mhz: 120
+mcu_voltage_v: 3.3
+fom_w_fj: 10.0       # Walden FoM for ADC energy model (fJ/conv-step)
