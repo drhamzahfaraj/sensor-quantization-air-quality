@@ -1,0 +1,182 @@
+# AQSC Methodology Documentation
+
+## Overview
+
+The Adaptive Quantisation for Sensor Chains (AQSC) framework jointly optimises two traditionally independent processes: sensor-level ADC resolution selection and inference-level neural network quantisation. This document provides a detailed technical reference for the methodology.
+
+---
+
+## 1. Problem Formulation
+
+Let $\mathbf{x}_c(t)$ denote the reading of sensor channel $c$ at time $t$, where $c \in \{\text{PM}_{2.5}, \text{PM}_{10}, \text{CO}_2, \text{VOC}, \text{CO}, \text{NO}_2, T, RH\}$ and $t$ indexes 1 Hz samples. The AQSC optimisation objective is:
+
+$$\min_{\theta_L,\, \theta_H,\, \alpha} \; E_{\text{total}}(\theta_L, \theta_H, \alpha)
+\quad \text{s.t.} \quad A \geq 0.95,\; D \leq 0.025 \cdot R_{\text{FS}}$$
+
+where $E_{\text{total}} = E_{\text{sensor}} + E_{\text{tx}} + E_{\text{infer}} + E_{\text{idle}}$, $A$ is classification accuracy, $D$ is reconstruction RMSE, and $R_{\text{FS}}$ is full-scale sensor range.
+
+---
+
+## 2. Stage A — Sensor-Level Adaptive Quantisation
+
+### 2.1 Rolling Variance
+
+For each channel $c$, variance over a sliding window of $\tau = 600$ samples (10 minutes at 1 Hz) is computed incrementally via Welford's online algorithm:
+
+$$\sigma_c^2(t) = \frac{1}{\tau} \sum_{i=t-\tau+1}^{t} \bigl(x_c(i) - \bar{x}_c(t)\bigr)^2$$
+
+Welford's method maintains three scalars per channel ($n$, $\bar{x}$, $M_2$), requiring $O(1)$ memory and $O(1)$ update cost per sample — essential for embedded deployment.
+
+### 2.2 Signal Entropy
+
+The normalised Shannon entropy over 16-bin histogram of the quantised signal within the current window:
+
+$$H_c(t) = -\sum_{k=1}^{K} p_k \log_2 p_k$$
+
+Entropy distinguishes genuinely dynamic signals (high $H$) from noisy-but-stationary ones (low $H$), a distinction variance alone cannot make.
+
+### 2.3 Composite Criterion and Bit-Width Assignment
+
+$$\Gamma_c(t) = \alpha \cdot \frac{\sigma_c^2(t)}{\sigma_{c,\max}^2} + (1 - \alpha) \cdot \frac{H_c(t)}{H_{c,\max}}$$
+
+where $\sigma_{c,\max}^2$ and $H_{c,\max}$ are channel-specific maxima from the calibration window (first 2,000 windows; see §5 for sensitivity), and $\alpha = 0.65$ (grid-searched on calibration data).
+
+Bit-width assignment:
+
+| Condition | Assigned bits |
+|-----------|--------------|
+| $\Gamma_c(t) < \theta_L = 0.15$ | 4 bits |
+| $0.15 \leq \Gamma_c(t) < \theta_H = 0.55$ | 8 bits |
+| $\Gamma_c(t) \geq 0.55$ | 16 bits |
+
+### 2.4 Intra-Window Spike Detection
+
+Sample-to-sample variance thresholding detects rapid transients (cooking onset, ventilation change) within the rolling window and temporarily boosts bit-width by 4 bits for the duration of the spike. This improves event-detection F1-score from 94.1% to 97.8% with negligible energy overhead (<0.3% of window budget).
+
+### 2.5 Channel-State-Aware Refinement
+
+When wireless SNR falls below a configurable threshold $\theta_{\text{SNR}}$, bit-width is floored at 8 bits to prevent compounding of ADC quantisation noise with transmission channel noise. This adds 2.6% system energy saving on average over the test period.
+
+### 2.6 ADC Energy Model (Walden FoM)
+
+$$P_c(t) = \text{FoM}_W \cdot 2^{b_c(t)} \cdot f_s, \qquad \text{FoM}_W = 10\text{ fJ/conv-step},\; f_s = 1\text{ Hz}$$
+
+Reducing from 16 bits to 4 bits cuts per-sample ADC energy by a factor of $2^{16}/2^4 = 4096$ (theoretical), ~15× in practice due to fixed overhead circuitry.
+
+---
+
+## 3. Stage B — Inference-Level Post-Training Quantisation
+
+### 3.1 Model Architecture
+
+A lightweight 1D-CNN for 8-class pollutant event classification:
+
+| Layer | Type | Filters/Units | Kernel | Output |
+|-------|------|--------------|--------|--------|
+| Conv-1 | Conv1D + BN + ReLU + MaxPool | 16 | 5 | 300×16 |
+| Conv-2 | Conv1D + BN + ReLU + MaxPool | 32 | 5 | 150×32 |
+| Conv-3 | Conv1D + BN + ReLU + MaxPool | 64 | 5 | 75×64 |
+| GAP | GlobalAveragePooling1D | — | — | 64 |
+| Dense | Dense + Dropout(0.3) | 64 | — | 64 |
+| Output | Dense + Softmax | 8 | — | 8 |
+
+**Input shape:** $(600 \times 8)$ — 10-minute window, 8 sensor channels.  
+**Parameters:** ~45,000 (176 KB FP32 → 44 KB INT8).  
+**Inference latency on STM32L4R9:** 7.9 ms.
+
+### 3.2 Post-Training Quantisation
+
+Asymmetric uniform INT8 PTQ with per-layer min-max calibration on a 10% held-out calibration set (no retraining required):
+
+$$x_q = \text{clip}\!\left(\left\lfloor \frac{x}{s_l} \right\rceil + z_l,\; 0,\; 255\right)$$
+
+where $s_l = (x_{\max}^{(l)} - x_{\min}^{(l)}) / 255$ and $z_l = -\lfloor x_{\min}^{(l)} / s_l \rceil$.
+
+**Per-MAC energy reduction:** FP32 (3.7 pJ/MAC) → INT8 (0.2 pJ/MAC) = **94.6% MAC reduction**, yielding **74.8% effective inference energy reduction** when accounting for memory access and control logic.
+
+### 3.3 Knowledge Distillation (Optional)
+
+For deployments requiring accuracy above 97%, a knowledge distillation pipeline is provided. A full-precision teacher (FP32, identical architecture) trains for 50 epochs, then the student is distilled with:
+
+$$\mathcal{L}_{\text{distill}} = \lambda \cdot \mathcal{L}_{\text{CE}}(\hat{y}, y) + (1-\lambda) \cdot T^2 \cdot \text{KL}\!\left(\sigma\!\left(\frac{z_T}{T}\right) \Big\| \sigma\!\left(\frac{z_S}{T}\right)\right)$$
+
+with temperature $T = 4$ and $\lambda = 0.3$.
+
+---
+
+## 4. Training Protocol
+
+| Setting | Value |
+|---------|-------|
+| Optimiser | Adam |
+| Learning rate | $10^{-3}$ |
+| Batch size | 64 |
+| Epochs | 50 |
+| Loss | Categorical cross-entropy |
+| Train split | Months 1–3 (DALTON temporal split) |
+| Calibration | First 2,000 windows of Month 1 |
+| Validation | Month 4 |
+| Test | Months 5–6 (winter season, domain shift) |
+
+All experiments repeated 5× with seeds {42, 43, 44, 45, 46}. Reported values are mean ± std. Statistical significance tested via paired *t*-test, *p* < 0.05.
+
+---
+
+## 5. Calibration Set Size Sensitivity
+
+A dedicated sensitivity study (§7.4 of paper) evaluates convergence of Stage A and Stage B separately:
+
+| Calibration windows | Stage A stability | Stage B layer-rank stability |
+|--------------------|-------------------|------------------------------|
+| 100 | 61.3% | 43.2% |
+| 500 | **100%** | 78.6% |
+| 1,000 | 100% | 91.4% |
+| **2,000** | **100%** | **100%** |
+| 5,000 | 100% | 100% |
+
+**Default:** 2,000 windows = 167 station-days of OpenAQ data. Stage A converges at 500 windows; Stage B requires 2,000 for full layer-rank stability.
+
+---
+
+## 6. Energy Model
+
+Total per-window system energy:
+
+$$E_{\text{total}} = E_{\text{sensor}} + E_{\text{tx}} + E_{\text{infer}} + E_{\text{idle}}$$
+
+| Component | Baseline (Fixed-16) | AQSC | Reduction |
+|-----------|---------------------|------|-----------|
+| Sensor (ADC) | 481.3 µJ | 171.8 µJ | 64.3% |
+| Transmission | Proportional to mean bit-width | — | 57.7% |
+| Inference | 3.7 pJ/MAC × N_MAC | 0.2 pJ/MAC × N_MAC | 74.8% |
+| Idle (MCU) | Platform-dependent | Unchanged | 0% |
+
+Hardware target: STM32L4R9 (Cortex-M4, 120 MHz, 640 KB SRAM, 2 MB Flash, 3.3 V).  
+Energy measured via INA219 current sensor (±2.3% accuracy, 100 Hz sampling).
+
+---
+
+## 7. Baselines
+
+| ID | Method | Sensor quant. | Inference quant. |
+|----|--------|--------------|-----------------|
+| Fixed-16 | Full-precision baseline | 16-bit uniform | FP32 |
+| BRECQ-8 | Block reconstruction PTQ | 16-bit uniform | INT8 (BRECQ) |
+| QAT-Mix | Mixed-precision QAT | 16-bit uniform | Mixed INT4/INT8 |
+| QLoRA-4b | Low-rank 4-bit adaptation | 16-bit uniform | INT4 LoRA |
+| Prune-50 | 50% unstructured pruning + PTQ | 16-bit uniform | INT8 |
+| **AQSC** | This work | 4/8/16-bit adaptive | INT8 PTQ |
+
+---
+
+## 8. Hyperparameter Reference
+
+| Parameter | Symbol | Default | Range tested |
+|-----------|--------|---------|-------------|
+| Low threshold | $\theta_L$ | 0.15 | [0.05, 0.30] |
+| High threshold | $\theta_H$ | 0.55 | [0.35, 0.75] |
+| Variance weight | $\alpha$ | 0.65 | [0.0, 1.0] |
+| Window size | $\tau$ | 600 s | [120, 1800] s |
+| Spike threshold | $\theta_{\text{spike}}$ | 5.0 | [2.5, 8.0] |
+| SNR floor threshold | $\theta_{\text{SNR}}$ | 15 dB | [10, 25] dB |
+| Calibration windows | — | 2,000 | [100, 5,000] |
