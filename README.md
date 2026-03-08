@@ -125,4 +125,10 @@ Requires TeX Live 2022+ with packages: `algorithm2e`, `booktabs`, `siunitx`, `au
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License. see [LICENSE](LICENSE) file for details.
+
+---
+
+## Acknowledgments
+
+The authors would like to acknowledge the Deanship of Graduate Studies and Scientific Research, Taif University for funding this work.
