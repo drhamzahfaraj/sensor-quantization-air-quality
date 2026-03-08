@@ -125,7 +125,7 @@ Requires TeX Live 2022+ with packages: `algorithm2e`, `booktabs`, `siunitx`, `au
 
 ## License
 
-This project is licensed under the MIT License. see [LICENSE]([![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)) file for details.
+This project is licensed under the MIT License. see (https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)) file for details.
 
 ---
 
