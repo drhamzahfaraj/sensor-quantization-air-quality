@@ -2,9 +2,8 @@
 ### Energy-Efficient Air Quality Monitoring on Resource-Constrained Edge Devices
 
 **Author:** Hamza Farraj  
-**Affiliation:** Department of Computer Science, King Abdulaziz University, Jeddah, Saudi Arabia  
-**Contact:** drhamzahfaraj@gmail.com  
-**Status:** Under Review
+**Affiliation:** Department of Science and Technology, Ranyah College, Taif University, Taif 21944, Saudi Arabia 
+**Email:** f.hamzah@tu.edu.sa
 
 ---
 
