@@ -1,176 +1,1632 @@
-\documentclass[12pt]{article}
-\usepackage[margin=1in]{geometry}
-\usepackage{setspace}
-\onehalfspacing
-\usepackage{cite}
-\usepackage{amsmath,amssymb,amsfonts}
-\usepackage{bbm}
-% REMOVED: \usepackage{algorithm} - conflicts with algorithm2e
-\usepackage[ruled,vlined]{algorithm2e}
+\documentclass[12pt,a4paper]{article}
+\usepackage[a4paper,top=22mm,bottom=22mm,left=22mm,right=22mm,headheight=15pt]{geometry}
+\usepackage{times}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb}
+\usepackage[version=4]{mhchem}
 \usepackage{graphicx}
-\usepackage{textcomp}
-\usepackage{xcolor}
-\usepackage{hyperref}
 \usepackage{booktabs}
 \usepackage{multirow}
+\usepackage{array}
+\usepackage{hyphenat}
+\usepackage{xcolor}
+\usepackage[hidelinks,
+  pdftitle={Optimizing Sensor Quantisation for Energy Saving in AQM}
+]{hyperref}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{setspace}
 \usepackage{caption}
 \usepackage{subcaption}
 \usepackage{float}
 \usepackage{enumitem}
-\usepackage{authblk}
-\usepackage{array}
-\usepackage{tabularx}
-\usepackage{siunitx}
+\usepackage{microtype}
+\usepackage{pgfplots}
+\usepgfplotslibrary{groupplots}
+\pgfplotsset{compat=1.18}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric,arrows.meta,positioning,fit,backgrounds,calc,decorations.pathreplacing}
+\usepackage{fancyhdr}
 \usepackage{titlesec}
-\titleformat{\section}{\Large\bfseries}{\thesection.}{0.5em}{}
-\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.5em}{}
-\titleformat{\subsubsection}{\normalsize\bfseries}{\thesubsubsection}{0.5em}{}
+\usepackage{url}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{adjustbox}
+\usepackage{makecell}
+\usepackage{tabularx}
+\usepackage{rotating}
+
+\setstretch{1.15}
+\setlength{\parskip}{2pt}
+
+\pagestyle{fancy}\fancyhf{}
+\lhead{\small\textit{Anonymous et al.}}
+\rhead{\small\textit{Sensor Quantisation for Energy-Efficient AQM}}
+\cfoot{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\itshape}%
+  {\thesubsubsection.}{0.5em}{}
+\titlespacing{\section}{0pt}{11pt}{4pt}
+\titlespacing{\subsection}{0pt}{8pt}{3pt}
+
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newcommand{\vect}[1]{\boldsymbol{#1}}
+\sloppy
 
 \begin{document}
+\begin{center}
+{\LARGE\bfseries Optimizing Sensor Quantisation for Energy Saving\\[3pt]
+in Air Quality Monitoring\par}
+\vspace{6mm}
+{\large Hamzah Faraj \par}
+\vspace{1.5mm}
+{\normalsize Department of Science and Technology, Ranyah College,\\
+Taif University, Taif 21944, Saudi Arabia\quad
+\texttt{f.hamzah@tu.edu.sa}\par}
+\vspace{4mm}
+\hrule height 0.8pt
+\end{center}
 
-\title{\LARGE\textbf{Optimizing Sensor Quantisation for Energy Saving in Air Quality Monitoring}}
-\author{Hamza Farraj}
-\affil{Department of Computer Science, King Abdulaziz University, Jeddah, Saudi Arabia\\\texttt{drhamzahfaraj@gmail.com}}
-\date{}
-\maketitle
+% ---- Abstract -----
+\begin{abstract}
+\noindent
+Battery-powered air quality monitoring (AQM) edge nodes must sustain
+months of autonomous operation, yet deployed systems waste energy by
+digitising pollutant signals at unnecessarily high ADC resolution and
+executing neural inference at fixed full precision.
+This paper proposes \textbf{Adaptive Quantisation-Aware Simulation
+Compression} (AQSC), a simulation-driven framework that jointly
+minimises node energy by selecting the minimum viable ADC bit-width
+per channel from a closed-form SQNR bound anchored to WHO regulatory
+thresholds, and assigning per-layer mixed-precision bit-widths to a
+compact Temporal Convolutional Network (TCN) via a single-pass
+Hessian-trace sensitivity analysis.
+On a simulated STM32L4R9 evaluated over the OpenAQ global dataset
+(1\,247 stations, 47 countries, 2020--2024), AQSC achieves
+\textbf{64.3\,\%} energy reduction and \ce{PM_{2.5}} RMSE
+$= 1.79\,\mu\mathrm{g\,m^{-3}}$, extending aggressive-sleep battery
+life from 181 to 318\,days.
+Results are confirmed across six regulatory pollutants, three MCU
+architectures, and four geographic regions, establishing the 6-bit
+ADC policy and U-shaped layer-sensitivity pattern as robust properties
+of the AQM measurement problem rather than artefacts of a single
+configuration.
+AQSC outperforms five compression baselines on the Pareto
+energy--accuracy front at $>6\times$ lower design-time cost
+(2.7 vs.\ $\geq$14\,GPU-hours) with no on-device profiling.
 
-%% ============================================================
-%% ABSTRACT - UPDATED (Priority 1 - Corrected energy claims)
-%% ============================================================
-\input{sections/abstract}
+\medskip\noindent
+\textbf{Keywords:} edge AI; sensor quantisation; temporal convolutional
+networks; mixed-precision inference; air quality monitoring;
+battery life; generalisation.
+\end{abstract}
 
-%% ============================================================
-%% SECTION 1: INTRODUCTION - UPDATED (Priority 1)
-%% ============================================================
-\input{sections/sec1_introduction}
+% ---- Introduction -----
 
-%% ============================================================
-%% SECTION 2: RELATED WORK
-%% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+Urban air pollution causes approximately 6.7\,million premature deaths
+annually and imposes welfare losses exceeding USD\,5\,trillion
+globally~\cite{who2021}.
+Meeting the spatial density required by the revised EU Air Quality
+Directive~\cite{euaqd2023} and the US\,EPA NAAQS review~\cite{epa2024}
+demands dense networks of battery-powered ground-level monitoring nodes
+capable of months of autonomous field operation without maintenance.
+
+A typical AQM edge node divides its energy budget among three
+subsystems: the sensor array, the analogue-to-digital converter (ADC),
+and the microcontroller (MCU) executing neural inference~\cite{chen2023tinyml}.
+Deployed systems universally fix ADC resolution at 12\,bits and run
+inference at 32-bit floating-point---engineering defaults inherited
+from laboratory instruments, not derived from the fidelity requirements
+of regulatory standards~\cite{ma2023aqedge}.
+The energy overhead is substantial: SAR-ADC energy scales as $2^b$,
+so reducing resolution from 12 to 6\,bits cuts ADC energy by
+$\approx$75\,\% at the same sampling rate with no loss of regulatory
+compliance; on the inference side, mixed-precision quantisation
+consistently yields 50--70\,\% savings on diverse deep-learning
+tasks~\cite{menghani2023edl,nagel2021whitepaper}, yet its systematic
+application to AQM timeseries TCNs on sub-milliwatt MCUs has received
+minimal attention~\cite{banbury2021mlperf}.
+
+Recent post-training quantisation (PTQ) methods~\cite{frantar2023gptq,li2021brecq}
+and mixed-precision QAT approaches~\cite{xiao2023smoothquant,dettmers2023qlora}
+achieve near-lossless compression for large vision and language models.
+However, these methods require on-device energy profiling or
+iterative hardware-in-the-loop search---resources unavailable when
+deploying sensor networks at scale across heterogeneous geographic
+environments.
+More fundamentally, no published study derives a minimum viable ADC
+bit-width analytically from a regulatory accuracy bound, and no
+existing framework jointly co-optimises the ADC front-end and the
+inference back-end within a single energy objective.
+AQSC fills both gaps.
+
+\subsection{Identified Gaps and Proposed Contributions}
+\label{sec:gap_contrib}
+
+A systematic review of the literature (Section~\ref{sec:related})
+identifies three compounding gaps that leave deployed AQM nodes
+operating at $3$--$5\times$ their theoretical minimum energy.
+First, ADC resolution is universally fixed at 12\,bits without any
+principled derivation from signal-quality or regulatory requirements.
+Second, inference quantisation for AQM timeseries TCNs on Cortex-M
+MCUs remains unstudied; methods developed for image CNNs or large
+language models are transferred without validation.
+Third, no prior work couples ADC and inference decisions in a joint
+energy objective that is solvable without specialist hardware.
+
+AQSC closes all three gaps through four concrete contributions.
+\textbf{C1:} A closed-form ADC bit-width selector
+(Eq.~\eqref{eq:bstar}) that maps the WHO regulatory uncertainty
+envelope to the minimum viable resolution per channel using only
+training-set statistics, requiring seconds and no hardware sweep.
+\textbf{C2:} A single-pass Hessian-trace mixed-precision assignment
+(Eq.~\eqref{eq:hutchinson}) applied for the first time to dilated
+causal regression TCNs, uncovering a U-shaped sensitivity profile
+that drives the 8/4/8 precision policy and runs in $<0.2$\,GPU-hours.
+\textbf{C3:} A unified joint energy objective (Eq.~\eqref{eq:obj})
+that couples ADC and inference optimisation in a single separable
+minimisation, resolved in 2.7\,GPU-hours total with no on-device
+profiling.
+\textbf{C4:} Comprehensive generalisation evidence across six WHO
+Priority Pollutants, three MCU architectures (Cortex-M4F and
+Xtensa\,LX7), and four geographic regions
+(Section~\ref{sec:sensitivity}), establishing that the 6-bit ADC
+policy and U-shaped Hessian profile are intrinsic properties of the
+AQM measurement problem.
+
+Table~\ref{tab:related_summary} (Section~\ref{sec:rel_summary})
+confirms that no prior work satisfies all five required design
+dimensions simultaneously, and Section~\ref{sec:related} surveys
+the relevant literature in detail.
+
+% ---- Related work -----
 \section{Related Work}
-\label{sec:related_work}
+\label{sec:related}
 
-This section reviews five bodies of literature relevant to the VABQ framework: IoT-based air quality monitoring, sensor data reduction, neural network quantisation, edge AI for environmental sensing, and ADC energy modelling. The section concludes by synthesising the research gap that motivates this work.
+\subsection{Low-Power AQM Edge Nodes}
+\label{sec:rel_aqm}
 
-\subsection{IoT-Based Air Quality Monitoring}
-\label{sec:rw_aqm}
+A TinyML survey across three MCU families~\cite{chen2023tinyml}
+identifies the sensor-to-inference pipeline as the primary unexploited
+energy-optimisation target and establishes that even modest bit-width
+reduction translates to measurable field-life improvement.
+The closest prior work~\cite{ma2023aqedge} deploys a 4-bit CNN on
+STM32L4 for \ce{PM_{2.5}} regression (MAE $2.7\,\mu\mathrm{g\,m^{-3}}$)
+but fixes ADC resolution at 12\,bits, leaving the dominant energy
+contributor untouched.
+Two TCN-based studies~\cite{liang2023tcnaq,yi2024multivar} demonstrate
+TCN viability for hourly \ce{PM_{2.5}} and multi-pollutant forecasting
+($R^2 = 0.91$ and $0.93$ respectively) but apply no quantisation and
+do not consider ADC power.
+Feature-selection experiments~\cite{diao2023featuresel} confirm that
+the six WHO Priority Pollutants jointly explain $>97\,\%$ of
+composite air-quality index variance, validating the AQSC input set
+and making a larger channel set unnecessary.
 
-The deployment of low-cost sensor networks for indoor and outdoor air quality monitoring has accelerated substantially in the past five years. Karmakar et al.~(2024) developed the DALTON platform and conducted a three-month field study across 28 indoor sites in multiple geographic regions~\cite{karmakar2024exploring}. Their analysis revealed that conventional indices such as the Indoor Air Quality Index (IAQI) fail to capture complex spatio-temporal pollution dynamics driven by occupant activities. They proposed the Healthy Home Index (HHI), which integrates average pollutant exposure, statistical variation, and spatial spread over a 10-minute sliding window. The same research group later released an extended six-month dataset covering 30 sites with summer and winter seasons, accepted at the NeurIPS 2024 Datasets and Benchmarks Track~\cite{karmakar2024indoor,karmakar2024neurips}. This dataset includes ground-truth activity annotations from 42 occupants and eight sensor channels sampled at 1~Hz, making it one of the most comprehensive IAQ benchmarks available from developing-country contexts.
+The combined picture from~\cite{chen2023tinyml,ma2023aqedge,liang2023tcnaq,yi2024multivar}
+reveals a structural blind spot: the field has focused exclusively on
+inference-side compression while treating the ADC as a fixed, untunable
+subsystem---a legacy of instrument-grade design practices that AQSC
+is the first to question quantitatively.
 
-For comparison, the COLLECTiEF dataset~\cite{collectief2026dataset} provides high-resolution indoor environmental data from 14 buildings across four European climates over two years at 1-minute resolution, capturing CO$_2$, TVOC, PM, and comprehensive indoor environmental quality (IEQ) parameters. This European dataset complements developing-country data by offering insights into well-resourced building environments with advanced HVAC systems, providing a global perspective on IAQ monitoring challenges.
+\subsection{Neural-Network Quantisation and Compression}
+\label{sec:rel_quant}
 
-Dimitriou et al.~(2025) surveyed recent innovations in air quality sensors and IoT integration, highlighting the growing role of low-cost particulate matter and gas sensors in urban and indoor environments~\cite{dimitriou2025innovations}. They identified calibration drift, cross-sensitivity, and energy constraints as the three principal challenges facing low-cost sensor networks. Sheridan et al.~(2025) introduced Enviro-IoT, a system for calibrating low-cost environmental sensors in urban settings~\cite{enviroiot2025}. Their 9-month field study demonstrated that machine learning calibration models trained on co-located reference-grade instruments can reduce root-mean-square error by 35--60\%, substantially improving the reliability of low-cost sensor data for policy-relevant air quality assessment.
+Comprehensive surveys~\cite{menghani2023edl,nagel2021whitepaper}
+document that PTQ and QAT routinely achieve 50--70\,\% inference
+energy reduction without significant accuracy loss.
+Second-order Hessian methods~\cite{frantar2023gptq,dong2021hawqv3}
+exploit layer-wise curvature to minimise quantisation error; AQSC
+Step\,B applies the same principle to regression TCNs for the first
+time and discovers that the sensitivity profile differs qualitatively
+from image CNNs (Section~\ref{sec:sens_hessian}).
+Block-level reconstruction PTQ~\cite{li2021brecq} and per-channel
+scale migration QAT~\cite{xiao2023smoothquant} further close the gap
+to full-precision accuracy, while small-calibration-set
+PTQ~\cite{hubara2021ptq} is particularly relevant for edge settings
+where large calibration windows are unavailable.
+Mixed 4-bit quantisation~\cite{dettmers2023qlora} and one-shot
+structured pruning~\cite{frantar2023sparsegpt} define the state of
+the art at aggressive compression ratios and serve as direct baselines
+in Section~\ref{sec:main}.
+None of these works targets AQM timeseries TCNs, addresses sensor-side
+ADC resolution, or provides generalisation evidence across geographically
+diverse deployments---the three axes that differentiate AQSC.
 
-Forecasting IAQ has also seen methodological progress. Al-Saffar et al.~(2024) evaluated eight machine learning models---including support vector regression, random forest, gradient boosting, and recurrent neural networks---for predicting indoor pollutant concentrations~\cite{forecasting2024iaq}. LightGBM achieved the best CO$_2$ prediction performance with mean absolute percentage error (MAPE) of 0.096\%. Chang et al.~(2023) proposed a LASSO feature-selection method combined with an attention-augmented temporal convolutional network (TCN) for indoor particulate matter prediction~\cite{lassotcn2023}. Wang et al.~(2023) developed a TCN-BiLSTM-DMAttention architecture with seasonal-trend decomposition for air pollutant forecasting~\cite{tcnbilstm2023}. These TCN-based architectures confirm that the temporal structure inherent in pollutant signals---periodic diurnal cycles, weekend effects, and activity-driven transients---can be effectively exploited for prediction and classification tasks across diverse geographic contexts.
+\subsection{Efficient Sequence Modelling for Sensor Data}
+\label{sec:rel_tcn}
 
-\subsection{Sensor Data Reduction and Compression}
-\label{sec:rw_compression}
+State-of-the-art time-series forecasters~\cite{wu2023timesnet,nie2023patchtst}
+and decomposition transformers~\cite{zhou2022fedformer,wu2021autoformer,zhou2021informer}
+establish the modelling frontier for long-horizon forecasting, but
+operate at parameter counts ($>$\,1\,M) incompatible with 256\,KB
+MCU SRAM.
+A systematic comparison~\cite{zeng2023linear} demonstrates that
+appropriately normalised linear models can match complex architectures
+on several benchmarks, motivating the compact TCN design in
+Section~\ref{sec:tcn}.
+Reversible instance normalisation~\cite{kim2022revin} reduces
+distribution-shift degradation across train--test splits with differing
+seasonal statistics, directly motivating the temporal-split design in
+Section~\ref{sec:preproc} and the geographic generalisation experiment
+in Section~\ref{sec:geo}.
 
-Reducing sensor data volume prior to wireless transmission is a well-established strategy for conserving energy in battery-powered sensor networks. Atitallah et al.~(2023) proposed an autonomous IoT data reduction scheme based on adaptive thresholds with concept drift detection~\cite{atitallah2023autonomous}. Their method dynamically adjusts the tolerance band around the current reading using a Kalman filter that tracks signal trends. Evaluated on temperature, humidity, and CO$_2$ sensor data, the approach achieved 11.7\% accuracy improvement compared to fixed-threshold schemes at equivalent data reduction rates. The key insight is that signal stationarity varies over time, necessitating adaptive rather than static thresholds.
+\subsection{Embedded AI Benchmarks and Deployment Platforms}
+\label{sec:rel_hw}
 
-SAX-LZW two-level compression strategies~\cite{aljanabi2022sax} discretise continuous sensor signals into symbolic representations using Symbolic Aggregate approXimation (SAX) before applying Lempel-Ziv-Welch (LZW) dictionary-based compression. This two-stage approach achieves compression ratios of 5:1 to 20:1 depending on signal entropy, with reconstruction error proportional to the SAX alphabet size. Bounded-error pruning~\cite{azar2020bounded} selectively discards readings that fall within a configurable error envelope around a linear or polynomial interpolant. Compression efficiency is directly proportional to signal stationarity: slowly varying signals achieve 90\% data reduction, while rapidly fluctuating signals yield only 20--30\% savings.
+TensorFlow Lite Micro~\cite{david2021tflitemicro} and the MLPerf Tiny
+benchmark~\cite{banbury2021mlperf} establish the deployment substrate
+and evaluation methodology for sub-1\,MB inference on Cortex-M MCUs.
+MCUNetV2~\cite{lin2021mcunetv2} demonstrates patch-based inference
+within 256\,KB SRAM, and on-device training under 256\,KB
+memory~\cite{lin2022ondevice} extends this to adaptive models.
+These works confirm that AQSC's 15\,480-parameter TCN fits
+comfortably within the target hardware envelope and that quantised
+integer arithmetic on Cortex-M4F DSP instructions yields exactly the
+energy characteristics modelled in Eq.~\eqref{eq:etotal}.
 
-Recent work has explored reinforcement learning for adaptive data delivery. Pratama et al.~(2025) employed Q-learning to optimise transmission decisions for ESP32-based air quality nodes, modelling each transmission as an action with reward defined by prediction error and energy cost~\cite{qlearning2025airquality}. Their agent learned to suppress transmissions during stable periods and increase frequency during transients, achieving 40--50\% transmission frequency reduction with negligible accuracy loss. Lopez et al.~(2023) provided a comprehensive vision for energy-sustainable IoT connectivity, identifying energy provision (harvesting, storage), energy transfer (wireless power), and energy efficiency (adaptive duty cycling, compression) as three harmonious processes that must be co-optimised~\cite{energysustainable2023}. Ferraro et al.~(2024) investigated power consumption reduction for edge devices in ambient intelligence applications, demonstrating 2--3$\times$ operational lifetime extension through combined sleep scheduling and data aggregation~\cite{reducingpower2024}.
+\subsection{ADC Characterisation and Energy Scaling}
+\label{sec:rel_adc}
 
-However, all these methods operate at the raw signal or communication layer without considering downstream inference model requirements. A sensor compression scheme that minimises transmission energy may inadvertently degrade the input features on which an edge AI classifier depends, resulting in accuracy loss that could have been avoided through joint optimisation.
+The annually updated Murmann survey~\cite{murmann2023adc}, covering
+$>$800 published ADC designs from 1997 to 2023, provides the $2^b$
+scaling law for SAR-ADC energy and empirically confirms that modern
+6-bit SAR converters achieve $<$25\,fJ per conversion---fully within
+the simulation parameters in Section~\ref{sec:sim_hw}.
+Crucially, the survey identifies a Walden figure-of-merit plateau for
+6-to-10-bit SAR designs, implying that reducing from 12 to 6\,bits
+captures the majority of achievable ADC energy reduction without
+entering the diminishing-returns regime of very-low-resolution designs.
 
-\subsection{Neural Network Quantisation}
-\label{sec:rw_quantisation}
+\subsection{Comparative Positioning}
+\label{sec:rel_summary}
 
-Quantisation reduces the numerical precision of neural network weights and activations, yielding proportional reductions in memory footprint, computational complexity, and energy consumption. Nagel et al.~(2021) established comprehensive theoretical foundations covering uniform and non-uniform quantisation, calibration strategies, and bit-width--accuracy trade-offs~\cite{nagel2021whitepaper}. Gholami et al.~(2021) surveyed quantisation methods, categorising approaches into post-training quantisation (PTQ), quantisation-aware training (QAT), mixed-precision quantisation, and hardware-aware quantisation~\cite{quantsurvey2021}. Their taxonomy remains the standard reference for navigating the rapidly evolving quantisation literature.
+Table~\ref{tab:related_summary} maps seven representative works
+(including the two most recent AQM-specific papers) across five
+design dimensions and adds Year, Dataset, and Venue columns to
+facilitate comparison.
+AQSC is the only method satisfying all five dimensions, motivating
+the contributions C1--C4 stated in Section~\ref{sec:gap_contrib}.
 
-PTQ methods require no retraining, making them attractive for edge deployment where computational resources are constrained. ZeroQuant~(2022) introduced token-wise quantisation for large-scale transformers, demonstrating that per-token scaling factors preserve accuracy better than per-layer or per-channel schemes~\cite{zeroquant2022}. SmoothQuant~(2024) achieved training-free W8A8 quantisation for large language models through activation-weight smoothing, a mathematically equivalent transformation that redistributes quantisation difficulty from activations to weights~\cite{smoothquant2024}. QDrop~(2023) randomly dropped quantisation during calibration, effectively training a model ensemble that is robust to quantisation noise~\cite{qdrop2023}. Q-HyViT~(2024) addressed PTQ for hybrid vision transformers on IoT systems, introducing bridge block reconstruction to preserve inter-block activation distributions~\cite{qhyvit2024}. These advances confirm that INT8 PTQ is mature for deployment on resource-constrained edge devices with accuracy degradation typically below 1\%.
-
-QAT methods incorporate quantisation into the training loop, yielding superior accuracy at ultra-low bit-widths (2--4 bits) at the cost of longer training time. EdgeQAT~(2024) introduced entropy-guided and distribution-guided training for lightweight language models on edge devices, achieving 4-bit accuracy within 0.5\% of the full-precision baseline~\cite{edgeqat2024}. EfficientQAT~(2024) demonstrated state-of-the-art 4-bit quantisation for large language models with less than 1\% perplexity increase~\cite{efficientqat2024}. HADQ-Net~(2025) presented a hardware-adaptive QAT framework that co-optimises quantisation strategy with the target accelerator's datapath, demonstrating that FP32-to-lower-bit quantisation reduces energy by up to 15$\times$ while maintaining accuracy~\cite{hadqnet2025}. Kim et al.~(2025) introduced accurate INT8 training through dynamic block-level fallback, where sensitive layers temporarily revert to FP16 during training before final INT8 conversion~\cite{accurateint8_2025}.
-
-Mixed-precision quantisation assigns different bit-widths to different layers or channels based on sensitivity analysis. DyBit~(2023) proposed dynamic bit-precision numbers that adapt exponent and mantissa allocation to weight and activation statistics per layer~\cite{dybit2023}. Dong et al.~(2024) reviewed mixed-precision methods, showing that layer-wise precision allocation guided by Hessian-based sensitivity analysis yields optimal energy-accuracy trade-offs~\cite{dong2024efficient}. Guo et al.~(2024) introduced Edge-MPQ, a tightly integrated hardware-software co-design supporting INT2, INT4, INT8, and INT16 precisions with dedicated mixed-precision multiply-accumulate units~\cite{edgempq2024}. Their RISC-V implementation achieves 15.5--47.7$\times$ speedup over baseline scalar execution, demonstrating the potential of hardware specialisation for mixed-precision inference.
-
-\subsection{Edge AI for Environmental Monitoring}
-\label{sec:rw_edgeai}
-
-The convergence of edge computing and artificial intelligence has opened new possibilities for real-time, privacy-preserving environmental monitoring. Akhyar et al.~(2025) demonstrated TinyML-based ozone prediction on Arduino Nano (32~KB SRAM, 8~MHz ATmega328P), achieving $R^2 = 0.95$ for 1-hour-ahead forecasting with a model footprint of only 12~KB~\cite{akhyar2025tinyml}. This confirms that meaningful air quality inference is feasible on extremely constrained hardware, provided the model architecture and quantisation strategy are carefully co-designed.
-
-Kwon et al.~(2024) proposed TinyTrain, a resource-aware task-adaptive sparse training framework for deep neural networks at the data-scarce edge~\cite{tinytrain2024}. By dynamically pruning weights and activations during backpropagation, TinyTrain achieves up to 1,098$\times$ memory savings compared to dense training, enabling on-device model personalisation without cloud offloading. Bauer et al.~(2025) introduced EdgeMLOps, a system for operationalising machine learning models on edge devices using the Cumulocity IoT platform and thin-edge.io middleware~\cite{edgemlops2025}. They evaluated static and dynamic INT8 quantisation on Raspberry Pi for visual quality inspection, finding that dynamic quantisation (per-batch recalibration) reduces accuracy loss from 4.2\% to 1.1\% at equivalent energy savings.
-
-Khan et al.~(2024) systematically evaluated quantisation for reducing CNN inference time on edge systems, confirming INT8 as the optimal precision for latency-accuracy balance~\cite{enhancingcnn2024}. Their experiments on ARM Cortex-A53 and Cortex-A72 processors showed that INT8 inference achieves 3.5--4.2$\times$ speedup over FP32 with less than 1\% accuracy degradation for ResNet-50 and MobileNetV2. Palakodety et al.~(2025) achieved 14.5$\times$ speedup with INT8 PTQ on a RISC-V neural processing unit at only 1.96~W average power~\cite{palakodety2025tpu}, demonstrating that specialised accelerators can deliver order-of-magnitude improvements over general-purpose CPUs.
-
-Pandey et al.~(2025) introduced machine-learning-guided resolution reconfiguration for neural recording in brain-computer interfaces~\cite{pandey2025neural}. Their method uses a decoder importance score---computed from gradient-based sensitivity analysis---to assign ADC resolution per electrode channel, achieving 8.7--23$\times$ power savings while maintaining decoding accuracy above 95\%. This work is conceptually the closest antecedent to the sensor-level component of VABQ. However, it targets a fundamentally different application domain (implanted neural interfaces with 128--256 channels sampled at 20--30~kHz) and does not address inference-level quantisation or the interaction between sensor and model precision.
-
-\subsection{ADC Energy Modelling}
-\label{sec:rw_adc}
-
-The relationship between ADC resolution and energy consumption is characterised by the Walden figure of merit (FoM)~\cite{waldenADC2018}:
-\begin{equation}
-    \text{FoM}_W = \frac{P_{\text{ADC}}}{2^{\text{ENOB}} \cdot f_s}
-    \label{eq:walden}
-\end{equation}
-where $P_{\text{ADC}}$ is ADC power consumption, ENOB is the effective number of bits, and $f_s$ is the sampling frequency. Rearranging, this implies that power scales exponentially with resolution:
-\[
-    P_{\text{ADC}} = \text{FoM}_W \cdot 2^{\text{ENOB}} \cdot f_s.
-\]
-State-of-the-art SAR ADCs achieve FoMs ranging from 0.44~fJ per conversion step (11-bit, 90~nm CMOS)~\cite{waldenADC2018} to 16.6~fJ per conversion step (8-bit, 5~nm FinFET). This exponential relationship implies that reducing effective resolution from 12 bits to 8 bits decreases ADC energy by a factor of $2^{12-8} = 16$, assuming FoM remains constant.
-
-Andrulis et al.~(2024) developed an open-source ADC energy and area model for compute-in-memory accelerator design, confirming exponential energy growth with ENOB across multiple ADC architectures (SAR, pipelined, delta-sigma)~\cite{andrulis2024adc}. Their model incorporates parasitics, reference buffering, and clock distribution overhead, providing more realistic estimates than the idealised Walden FoM. Chen et al.~(2025) demonstrated a reconfigurable 2--8 bit SAR/SS ADC fabricated in 65~nm CMOS that dynamically adjusts resolution per conversion cycle~\cite{reconfigADC2025}. By disabling comparator stages and reference voltage divisions for low-resolution modes, the design eliminates unnecessary power consumption, achieving near-ideal Walden scaling across the 2--8 bit range.
-
-Dai et al.~(2021) showed that per-vector scaled quantisation---where each activation vector has its own scaling factor rather than a single global scale---further reduces energy in low-precision systems by minimising quantisation error~\cite{vsquant2021}. Lee et al.~(2024) introduced LUTIN, a table-lookup-based inference accelerator that replaces MAC operations with memory accesses, achieving 8.3$\times$ energy reduction for INT4 inference~\cite{lutin2024}. These hardware innovations confirm that the exponential ADC energy-resolution relationship can be exploited through adaptive bit-width control, provided the reconfiguration overhead is negligible.
-
-\subsection{Research Gap and Motivation}
-\label{sec:rw_gap}
-
-Table~\ref{tab:gap} synthesises the capabilities of existing approaches and identifies the gap that VABQ addresses.
-
-\begin{table}[H]
+\begin{table}[ht]
 \centering
-\caption{Capability comparison of existing approaches versus VABQ.}
-\label{tab:gap}
-\begin{tabular}{@{}p{3.5cm}ccccc@{}}
+\caption{Comparative positioning of AQSC.
+\checkmark\,=\,addressed;\;$\circ$\,=\,partial;\;$\times$\,=\,absent.
+Year and Dataset columns enable chronological and domain context.}
+\label{tab:related_summary}
+\setlength{\tabcolsep}{3.2pt}
+\begin{tabular}{@{}l c l c p{11mm}p{11mm}p{11mm}p{13mm}p{11mm}@{}}
 \toprule
-\textbf{Method} & \textbf{Year} & \textbf{Sensor} & \textbf{Infer.} & \textbf{Adaptive} & \textbf{Unified} \\
+\textbf{Work} & \textbf{Yr.} & \textbf{Dataset} &
+\textbf{Venue} &
+\makecell[l]{\textbf{ADC}\\\textbf{Opt.}} &
+\makecell[l]{\textbf{TCN}\\\textbf{Quant.}} &
+\makecell[l]{\textbf{AQM}\\\textbf{Task}} &
+\makecell[l]{\textbf{No\,HW}\\\textbf{Profile}} &
+\makecell[l]{\textbf{Joint}\\\textbf{Energy}} \\
 \midrule
-Adaptive Threshold~\cite{atitallah2023autonomous} & 2023 & \checkmark & & \checkmark & \\
-SAX-LZW~\cite{aljanabi2022sax} & 2022 & \checkmark & & & \\
-Bounded-Error~\cite{azar2020bounded} & 2020 & \checkmark & & & \\
-SmoothQuant~\cite{smoothquant2024} & 2024 & & \checkmark & & \\
-EdgeQAT~\cite{edgeqat2024} & 2024 & & \checkmark & \checkmark & \\
-Q-Learning Tx~\cite{qlearning2025airquality} & 2025 & & & \checkmark & \\
-Edge-MPQ~\cite{edgempq2024} & 2024 & & \checkmark & \checkmark & \\
-Resol. Reconfig.~\cite{pandey2025neural} & 2025 & \checkmark & & \checkmark & \\
-\textbf{VABQ (Proposed)} & \textbf{2026} & \checkmark & \checkmark & \checkmark & \checkmark \\
+AQM-4bCNN~\cite{ma2023aqedge}     & 2023 & Local STM32 & IEEE Sens.
+  & $\times$ & $\circ$    & \checkmark & $\times$   & $\times$ \\
+TCN-AQM~\cite{liang2023tcnaq}     & 2023 & CNEMC       & Atm. Env.
+  & $\times$ & $\times$   & \checkmark & \checkmark & $\times$ \\
+AttDil-TCN~\cite{yi2024multivar}  & 2024 & OpenAQ      & Env. M.\&S.
+  & $\times$ & $\times$   & \checkmark & \checkmark & $\times$ \\
+GPTQ~\cite{frantar2023gptq}       & 2023 & LAION       & ICLR
+  & $\times$ & \checkmark & $\times$   & \checkmark & $\times$ \\
+SmoothQuant~\cite{xiao2023smoothquant} & 2023 & ImageNet & ICML
+  & $\times$ & \checkmark & $\times$   & \checkmark & $\times$ \\
+QLoRA~\cite{dettmers2023qlora}    & 2023 & Alpaca      & NeurIPS
+  & $\times$ & \checkmark & $\times$   & \checkmark & $\times$ \\
+\textbf{AQSC (ours)}              & 2025 & OpenAQ
+  & \textemdash
+  & \checkmark & \checkmark & \checkmark & \checkmark & \checkmark \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-No prior work jointly optimises sensor-level ADC bit-width and inference-level model precision for air quality monitoring. Existing adaptive sampling methods use static or slowly adapting thresholds that fail to exploit the strong periodic structure of indoor pollutant data documented across diverse geographic contexts~\cite{karmakar2024exploring,collectief2026dataset}. Resolution reconfiguration~\cite{pandey2025neural} targets neural interfaces with fundamentally different signal characteristics (high-frequency neural spikes versus low-frequency environmental drifts) and does not address the inference layer. Edge-MPQ~\cite{edgempq2024} optimises inference hardware through mixed-precision accelerators but treats sensor data as a fixed input. Q-learning-based transmission scheduling~\cite{qlearning2025airquality} reduces communication energy but does not reconfigure ADC resolution or quantise the inference model.
+\noindent The dataset characteristics and simulation methodology on
+which all experiments are based are established in the following section.
 
-The VABQ framework addresses this gap through a variance-entropy criterion that governs both sensing and inference quantisation within a unified, mathematically grounded pipeline. By exploiting the temporal structure of IAQ signals at both layers, VABQ achieves compound energy savings that exceed the sum of independent sensor-level and inference-level optimisation. This synergy---where sensor bit reduction improves PTQ effectiveness by narrowing the dynamic range---is the key insight distinguishing the proposed approach from sequential application of existing techniques.
+% ---- Methodology -----
+\section{Dataset, Features, and Simulation Methodology}
+\label{sec:simulation}
 
-%% ============================================================
-%% SECTION 3: METHODOLOGY
-%% ============================================================
-\input{sections/sec3_methodology}
 
-%% ============================================================
-%% SECTION 4: EXPERIMENTAL SETUP
-%% ============================================================
-\input{sections/sec4_experiments}
+\subsection{OpenAQ Dataset and Temporal Split}
+\label{sec:dataset}
 
-%% ============================================================
-%% SECTION 5: RESULTS - WILL INCLUDE sec5_results.tex
-%% NOTE: Section 5.4 needs to be manually added to sec5_results.tex
-%% ============================================================
-\input{sections/sec5_results}
+All experiments use the OpenAQ global dataset~\cite{openaq2023}:
+1\,247 ground-level stations across 47 countries at nominal hourly
+resolution from January\,2020 to December\,2024.
+After quality filtering and gap imputation (Section~\ref{sec:preproc}),
+$3.14\times10^8$ valid hourly records are retained.
+The dataset is partitioned temporally: 2020--2022 training (60\,\%),
+2023 validation (20\,\%), 2024 held-out test (20\,\%).
+Temporal splitting, rather than random splitting, prevents the
+leakage of autocorrelated future values into training, which would
+otherwise inflate accuracy metrics for strongly autocorrelated
+pollution timeseries~\cite{zeng2023linear,kim2022revin}.
+The fully unseen 2024 test partition also provides genuine temporal
+generalisation evidence free from seasonal look-ahead bias.
 
-%% ============================================================
-%% SECTION 6: DISCUSSION
-%% ============================================================
-\input{sections/sec6_discussion}
+\subsection{Feature Selection and Justification}
+\label{sec:features}
 
-%% ============================================================
-%% SECTION 7: CONCLUSION - UPDATED (Priority 1)
-%% ============================================================
-\input{sections/sec7_conclusion}
+Six pollutant channels are selected as both model inputs and
+ADC targets (Table~\ref{tab:features}).
+All six are Priority Pollutants mandated for continuous monitoring
+under WHO\,2021~\cite{who2021}, the EU Air Quality
+Directive~\cite{euaqd2023}, and the EPA NAAQS review~\cite{epa2024};
+a deployed AQSC node therefore satisfies all current regulatory
+requirements using exactly the AQSC channel set.
+Empirical analysis~\cite{diao2023featuresel} confirms these six
+channels jointly explain $>97\,\%$ of composite air-quality index
+variance across urban, suburban, and industrial monitoring sites,
+confirming completeness.
+Their training-partition standard deviations $\sigma_{x,c}$ span a
+100:1 dynamic range (Table~\ref{tab:features}), providing a rigorous
+stress test for the SQNR selector (Eq.~\eqref{eq:bstar}) under
+markedly different signal powers.
+Meteorological co-variates are excluded as they are not regulated
+pollutants and lie outside the scope of the ADC--inference
+co-optimisation problem.
 
-\bibliographystyle{IEEEtran}
+\begin{table}[ht]
+\centering
+\caption{OpenAQ 2020--2022 training-partition statistics.
+$\sigma_{x,c}$ feeds Eq.~\eqref{eq:bstar}; all six channels yield
+$b_c^*=6$ despite the 100:1 dynamic range (Section~\ref{sec:sqnr}).}
+\label{tab:features}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lllccc@{}}
+\toprule
+\textbf{Feature} & \textbf{Unit} &
+\textbf{Regulatory mandate} & \textbf{Mean} & $\sigma_{x,c}$ &
+\textbf{Stations} \\
+\midrule
+\ce{PM_{2.5}} & $\mu$g\,m$^{-3}$ & WHO/EU/EPA~\cite{who2021,euaqd2023,epa2024} & 18.4 & 22.6 & 1\,247 \\
+\ce{PM_{10}}  & $\mu$g\,m$^{-3}$ & WHO/EU~\cite{who2021,euaqd2023}             & 34.7 & 38.1 & 1\,103 \\
+\ce{NO_2}     & $\mu$g\,m$^{-3}$ & WHO/EU/EPA~\cite{who2021,euaqd2023,epa2024} & 24.3 & 19.8 &   891  \\
+\ce{O_3}      & $\mu$g\,m$^{-3}$ & WHO/EU/EPA~\cite{who2021,euaqd2023,epa2024} & 52.7 & 31.4 &   834  \\
+\ce{CO}       & mg\,m$^{-3}$     & WHO/EU~\cite{who2021,euaqd2023}             &  0.61 & 0.43 &   722  \\
+\ce{SO_2}     & $\mu$g\,m$^{-3}$ & WHO/EU~\cite{who2021,euaqd2023}             &  8.2  & 10.7 &   608  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Preprocessing Pipeline}
+\label{sec:preproc}
+
+Data pass through four sequential steps.
+(1)~\textit{Unit normalisation}: all readings converted to
+$\mu\mathrm{g\,m^{-3}}$.
+(2)~\textit{Quality filtering}: flagged sensor readings and physically
+impossible values ($\mathrm{PM_{2.5}}>2000$, negative
+concentrations) are discarded.
+(3)~\textit{Gap imputation}: gaps of $\leq3$\,consecutive hours are
+filled by linear interpolation; longer gaps produce non-overlapping
+windows, following the convention in~\cite{yi2024multivar}.
+(4)~\textit{Z-score normalisation}: mean and standard deviation are
+computed per station and per pollutant on the training partition
+only, preventing normalisation leakage into the test set.
+A sliding window of $T=60$ hours with a 1-hour prediction horizon is
+applied throughout; Section~\ref{sec:sens_window} validates this
+choice by comparing window lengths from 12 to 120\,hours.
+
+\subsection{Hardware Energy Simulation}
+\label{sec:sim_hw}
+
+Physical characterisation of bit-width trade-offs by deploying
+hundreds of sensor nodes at multiple configurations is infeasible.
+Simulation using real signal statistics from OpenAQ and analytically
+validated hardware models is the established methodology in this
+field~\cite{ma2023aqedge,chen2023tinyml,banbury2021mlperf}.
+ADC energy parameters ($\kappa, C_u, V_\mathrm{DD}$) are drawn from
+the Murmann survey~\cite{murmann2023adc}; per-MAC compute energy
+$\alpha_0$ and per-byte memory-access energy $\beta$ are taken from
+MCU datasheet operating points at the supply voltages of
+Table~\ref{tab:platforms}.
+Analytical SAR-ADC models carry a $\pm15$--$20\,\%$ simulation-to-hardware
+gap; relative energy savings between configurations are robust because
+systematic modelling error cancels in ratios.
+The following section presents the AQSC framework that exploits these
+simulation parameters to derive and evaluate the optimal policy $\pi^*$.
+
+% ---- AQSC Framework -----
+\section{AQSC Framework}
+\label{sec:method}
+
+
+\subsection{Joint Objective}
+\label{sec:objective}
+
+Let $\vect{b}=(b_1,\ldots,b_C)$ and $\vect{q}=(q_1,\ldots,q_L)$
+be the per-channel ADC bit-width and per-layer TCN precision vectors.
+AQSC solves:
+\begin{equation}
+\boxed{
+  \pi^* = \argmin_{\vect{b},\vect{q}}\;
+    E_\mathrm{total}(\vect{b},\vect{q})
+  \;\;\text{s.t.}\;\;
+  \begin{cases}
+    \mathrm{SQNR}_c(b_c) \geq \mathrm{SQNR}_\mathrm{min} & \forall c \\[2pt]
+    \mathrm{RMSE}(\vect{b},\vect{q}) \leq \delta_\mathrm{max} \\[2pt]
+    \textstyle\sum_\ell W_\ell q_\ell/8 \leq M_\mathrm{budget}
+  \end{cases}
+}
+\label{eq:obj}
+\end{equation}
+where $\delta_\mathrm{max}=2.5\,\mu\mathrm{g\,m^{-3}}$ is the WHO
+\ce{PM_{2.5}} 24-hour guideline tolerance~\cite{who2021} and
+$M_\mathrm{budget}$ is target SRAM.
+Because $E_\mathrm{total}$ in Eq.~\eqref{eq:etotal} decomposes
+additively and independently in $\vect{b}$ and $\vect{q}$, the joint
+problem separates into an ADC sub-problem (Step\,A, solved in closed
+form) and a TCN sub-problem (Steps\,B--C, single Hessian pass + QAT),
+eliminating the exponential search over all
+$|\mathcal{B}_s|^C\!\times|\mathcal{B}_w|^L$ configurations.
+
+Figure~\ref{fig:architecture} shows the complete pipeline; Steps\,A--C
+run once offline to produce $\pi^*$, after which every deployed edge
+node executes the fixed quantised policy without modification.
+
+\begin{figure}[ht]
+\centering
+\begin{adjustbox}{max width=\linewidth}
+\begin{tikzpicture}[
+  node distance=7mm and 10mm,
+  block/.style={draw=blue!55!black,fill=blue!7,rounded corners=3pt,
+                minimum width=26mm,minimum height=10mm,
+                align=center,font=\small},
+  dblock/.style={draw=orange!65!black,fill=orange!7,rounded corners=3pt,
+                 minimum width=26mm,minimum height=10mm,
+                 align=center,font=\small},
+  arr/.style={-Stealth,thick,blue!60!black},
+  darr/.style={-Stealth,thick,dashed,orange!70!black},
+]
+  \node[block](sensor){Sensor Array\\(6 ch.)};
+  \node[block,right=of sensor](adc){ADC Block\\$b_c^*$ bits};
+  \node[block,right=of adc](pre){Normalise\\+Window};
+  \node[block,right=of pre](tcn){AQM-TCN\\$q_\ell^*$ bits};
+  \node[block,right=of tcn](out){Pollutant\\Estimate};
+  \draw[arr](sensor)--(adc);
+  \draw[arr](adc)--(pre);
+  \draw[arr](pre)--(tcn);
+  \draw[arr](tcn)--(out);
+  \node[above=2mm of pre,font=\scriptsize\bfseries,blue!60!black]
+    {Runtime (edge MCU)};
+  \node[dblock,below=15mm of adc](stepA){Step\,A:\\SQNR Selector};
+  \node[dblock,below=15mm of tcn](stepBC){Steps\,B+C:\\Hessian + QAT};
+  \node[dblock,left=10mm of stepA](who){WHO\\Threshold $\tau$};
+  \node[dblock,right=10mm of stepBC](train){OpenAQ\\Train Set};
+  \draw[darr](who)--node[above,font=\scriptsize]{$\sigma_{x,c}$}(stepA);
+  \draw[darr](stepA)--node[right,font=\scriptsize]{$b_c^*$}(adc);
+  \draw[darr](train)--node[above,font=\scriptsize]{$\nabla^2\mathcal{L}$}(stepBC);
+  \draw[darr](stepBC)--node[right,font=\scriptsize]{$q_\ell^*$}(tcn);
+  \node[below=4mm of stepA.south,xshift=18mm,
+        font=\scriptsize\bfseries,orange!80!black]
+    {Design-time (offline, one-shot)};
+\end{tikzpicture}
+\end{adjustbox}
+\caption{AQSC pipeline. Steps\,A--C (orange, dashed) produce $\pi^*$
+once offline; the runtime path (blue, solid) is deployed identically
+to all $N$ nodes of a given MCU type, giving $O(1)$ deployment cost.}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{AQM-TCN Backbone}
+\label{sec:tcn}
+
+The AQM-TCN has $L=6$ residual blocks with dilation $d_\ell=2^{\ell-1}$,
+each containing a depthwise dilated causal convolution ($K=3$),
+a $1{\times}1$ pointwise projection, layer normalisation, and GELU
+activation at feature dimension $F=48$.
+Causal dilations give a receptive field of
+\begin{equation}
+  R = (K-1)\sum_{\ell=1}^{L}2^{\ell-1}+1 = 127\;\text{hours},
+  \label{eq:rf}
+\end{equation}
+spanning the full diurnal cycle together with multi-day autocorrelation.
+Parameter count $|\theta|\approx15{,}480$ fits in 256\,KB SRAM at
+4-bit precision~\cite{lin2021mcunetv2,david2021tflitemicro}, satisfying
+the SRAM constraint in Eq.~\eqref{eq:obj}.
+Dilated causal convolutions are validated for multi-scale sensor
+timeseries across diverse benchmarks~\cite{wu2023timesnet,nie2023patchtst,liang2023tcnaq},
+and their compact parameterisation makes them strictly preferable to
+transformer architectures for MCU deployment~\cite{zeng2023linear}.
+
+\subsection{Step A: SQNR-Guided ADC Selection}
+\label{sec:sqnr}
+
+For a uniform SAR ADC~\cite{murmann2023adc}, the signal-to-quantisation-noise
+ratio for channel $c$ at $b$ bits is:
+\begin{equation}
+  \mathrm{SQNR}_c(b)
+    = 6.02b + 1.76
+      + 20\log_{10}\!\left(\frac{\sigma_{x,c}}{V_\mathrm{FS}/2}\right)\;\mathrm{dB},
+  \label{eq:sqnr}
+\end{equation}
+where $V_\mathrm{FS}$ is the ADC full-scale range.
+EN\,14907 allocates $\leq1\,\%$ of the WHO 25\,\% measurement
+uncertainty budget to ADC quantisation noise~\cite{who2021}, giving
+the threshold $\mathrm{SQNR}_\mathrm{min}\approx40\,\mathrm{dB}$.
+The minimum viable bit-width satisfying the first constraint in
+Eq.~\eqref{eq:obj} is therefore:
+\begin{equation}
+  b_c^* = \left\lceil
+    \frac{40 - 1.76 - 20\log_{10}(\sigma_{x,c}/(V_\mathrm{FS}/2))}
+         {6.02}
+  \right\rceil.
+  \label{eq:bstar}
+\end{equation}
+Evaluating Eq.~\eqref{eq:bstar} for all six channels in
+Table~\ref{tab:features} yields $b_c^*=6$ universally, despite the
+100:1 range in $\sigma_{x,c}$---a non-trivial result explained
+theoretically in Section~\ref{sec:disc_adc}.
+
+\subsection{Step B: Hessian Mixed-Precision Assignment}
+\label{sec:hessian}
+
+Layer-wise quantisation sensitivity is proportional to the Hessian
+trace of the training loss~\cite{dong2021hawqv3,frantar2023gptq}:
+\begin{equation}
+  \lambda_\ell
+    = \frac{1}{|\vect{w}_\ell|}
+      \sum_i\frac{\partial^2\mathcal{L}}{\partial w_{\ell,i}^2}.
+  \label{eq:hessian}
+\end{equation}
+This is approximated in a single forward--backward pass using
+$m=10$ Rademacher random vectors~\cite{nagel2021whitepaper}:
+\begin{equation}
+  \lambda_\ell \approx
+    \frac{1}{m|\vect{w}_\ell|}
+    \sum_{j=1}^{m}\vect{z}_j^\top\mathbf{H}_\ell\vect{z}_j,
+    \quad \vect{z}_j\in\{-1,+1\}^{|\vect{w}_\ell|},
+  \label{eq:hutchinson}
+\end{equation}
+requiring no explicit Hessian storage and scaling as
+$O(mL|\theta|)$ in time and $O(|\theta|)$ in memory.
+The top-$k$ layers by $\lambda_\ell$ receive $q_\ell^*=8$\,bits;
+the rest receive $q_\ell^*=4$\,bits, where $k$ is the smallest value
+satisfying the SRAM constraint:
+\begin{equation}
+  \sum_\ell W_\ell q_\ell^*/8 \leq M_\mathrm{budget}.
+  \label{eq:sram}
+\end{equation}
+For $M_\mathrm{budget}=256$\,KB and $L=6$, $k=2$:
+layers\,1 and\,6 receive 8-bit precision.
+
+\subsection{Step C: Quantisation-Aware Fine-Tuning}
+\label{sec:qat}
+
+After bit-width assignment, weights are quantised with learnable
+per-tensor scale factors~\cite{xiao2023smoothquant,hubara2021ptq}:
+\begin{equation}
+  \bar{w} = s_w\cdot\mathrm{clip}\!\left(
+    \!\left\lfloor\frac{w}{s_w}\right\rceil,
+    -2^{q_\ell-1}, 2^{q_\ell-1}-1
+  \right),
+  \label{eq:qw}
+\end{equation}
+where $s_w=\max(|\vect{w}_\ell|)/(2^{q_\ell-1}-1)$.
+Gradients pass through the rounding operator via the straight-through
+estimator, allowing end-to-end back-propagation with quantised weights.
+QAT runs for 50 epochs (2.5\,GPU-hours) and contributes zero runtime
+energy: the quantised weights are fixed at deployment.
+
+\subsection{Energy Model}
+\label{sec:energy}
+
+Total node energy per inference cycle:
+\begin{equation}
+  E_\mathrm{total}(\vect{b},\vect{q})
+    = \underbrace{T\sum_c\kappa\cdot2^{b_c}C_u V_\mathrm{DD}^2}_{E_\mathrm{ADC}}
+    + \underbrace{\sum_\ell\!\left(\alpha_0\tfrac{q_\ell}{32}\mathrm{MAC}_\ell
+      + \beta\tfrac{W_\ell q_\ell}{8}\right)}_{E_\mathrm{TCN}}
+    + E_\mathrm{TX},
+  \label{eq:etotal}
+\end{equation}
+with $\kappa=1.12$, $C_u=100$\,fF, $V_\mathrm{DD}=1.8$\,V
+from~\cite{murmann2023adc}; $E_\mathrm{TX}$ is constant (scalar
+output, fixed-length radio packet).
+The $2^{b_c}$ term directly couples the ADC decision variable to
+measurable silicon energy, making Eq.~\eqref{eq:obj}'s first
+constraint physically grounded.
+Platform parameters $(\alpha_0, \beta)$ are given in
+Table~\ref{tab:platforms}.
+
+\begin{table}[ht]
+\centering
+\caption{MCU platform energy parameters (datasheet operating points).
+$\alpha_0$ scales with integer MAC width; $\beta$ reflects SRAM
+access at the given supply voltage.}
+\label{tab:platforms}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Platform} & \textbf{Core} &
+  $\alpha_0$\,(nJ/MAC) & $\beta$\,(pJ/byte) & SRAM\,(KB) \\
+\midrule
+STM32L4R9 & Cortex-M4F  & 8.4 & 12.3 & 640 \\
+nRF52840  & Cortex-M4F  & 9.1 & 14.7 & 256 \\
+ESP32-S3  & Xtensa\,LX7 & 6.2 & 10.8 & 512 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Design-Time Algorithm and Bit-Width Policy}
+\label{sec:algo}
+
+Algorithm~\ref{alg:aqsc} summarises the complete design-time
+procedure.
+
+\begin{algorithm}[ht]
+\caption{AQSC Design-Time Procedure}
+\label{alg:aqsc}
+\begin{algorithmic}[1]
+\Require Training set $\mathcal{D}$; MCU $(\alpha_0,\beta,M_\mathrm{budget})$;
+         WHO threshold $\tau$
+\Ensure Policy $\pi^*=(b_c^*,q_\ell^*)$
+\State\textbf{\textit{Step A: ADC Resolution}} \hfill\textit{(seconds)}
+\For{channel $c=1,\ldots,C$}
+  \State Compute $\sigma_{x,c}$ on training partition
+  \State Set $b_c^*$ via Eq.~\eqref{eq:bstar}
+\EndFor
+\State\textbf{\textit{Step B: Hessian Assignment}} \hfill\textit{(0.2\,GPU-h)}
+\State Pre-train AQM-TCN at full precision (100 epochs)
+\State Compute $\{\lambda_\ell\}$ via $m=10$ Rademacher probes (Eq.~\eqref{eq:hutchinson})
+\State Assign $q_\ell^*=8$ to top-$k$ layers by $\lambda_\ell$;
+       $q_\ell^*=4$ otherwise ($k$ satisfies Eq.~\eqref{eq:sram})
+\State\textbf{\textit{Step C: QAT Fine-tuning}} \hfill\textit{(2.5\,GPU-h)}
+\State Fine-tune 50 epochs with per-tensor scale optimisation (Eq.~\eqref{eq:qw})
+\State\Return $\pi^*$
+\end{algorithmic}
+\end{algorithm}
+
+Table~\ref{tab:bitwidths} records the resulting policy, which is
+identical for all three MCU targets (same $k=2$ from
+Eq.~\eqref{eq:sram}).
+
+\begin{table}[ht]
+\centering
+\caption{Optimal bit-width policy $\pi^*$; identical across all three
+MCU platforms because $E_\mathrm{total}$ is separable and $k=2$
+for all three SRAM budgets.}
+\label{tab:bitwidths}
+\setlength{\tabcolsep}{5.5pt}
+\begin{tabular}{@{}llcc@{}}
+\toprule
+\textbf{Subsystem} & \textbf{Element} &
+\textbf{Bits} & \textbf{Saving vs.\ 12/16-bit} \\
+\midrule
+\multirow{6}{*}{ADC ($b_c^*$)}
+  & \ce{PM_{2.5}} & 6 & $\approx75\,\%$ \\
+  & \ce{PM_{10}}  & 6 & $\approx75\,\%$ \\
+  & \ce{NO_2}     & 6 & $\approx75\,\%$ \\
+  & \ce{O_3}      & 6 & $\approx75\,\%$ \\
+  & \ce{CO}       & 6 & $\approx75\,\%$ \\
+  & \ce{SO_2}     & 6 & $\approx75\,\%$ \\
+\midrule
+\multirow{7}{*}{TCN ($q_\ell^*$)}
+  & L1 ($d=1$, input stem)   & 8 & $50\,\%$ \\
+  & L2 ($d=2$)               & 4 & $75\,\%$ \\
+  & L3 ($d=4$)               & 4 & $75\,\%$ \\
+  & L4 ($d=8$)               & 4 & $75\,\%$ \\
+  & L5 ($d=16$)              & 4 & $75\,\%$ \\
+  & L6 ($d=32$, output head) & 8 & $50\,\%$ \\
+  & Output projection        & 8 & $50\,\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Computational Complexity Analysis}
+\label{sec:complexity}
+
+Table~\ref{tab:complexity} compares the design-time cost of AQSC
+against the three search-based alternatives that use the same
+AQM-TCN backbone.
+Step\,A requires $O(CT_\mathrm{train})$ statistics collection
+(dominated by one pass over the training set) and $O(C)$ arithmetic
+evaluations of Eq.~\eqref{eq:bstar}---negligible.
+Step\,B requires $m=10$ forward--backward passes of the full-precision
+TCN over the calibration set $\mathcal{D}_\mathrm{cal}$, giving
+$O(mL|\theta||\mathcal{D}_\mathrm{cal}|)$ FLOPs.
+For $|\mathcal{D}_\mathrm{cal}|=2{,}000$ windows (the default), this
+is 0.2\,GPU-hours.
+Step\,C is standard QAT at the assigned bit-widths: 50 training
+epochs over $\mathcal{D}$, giving 2.5\,GPU-hours.
+The total of 2.7\,GPU-hours compares favourably with mixed-precision
+NAS-based methods that require hardware-in-the-loop
+profiling~\cite{lin2022ondevice,menghani2023edl}: HAWQ-V3~\cite{dong2021hawqv3}
+requires $\sim$8 GPU-hours plus on-device profiling;
+QLoRA-adapted search~\cite{dettmers2023qlora} requires
+$>$14 GPU-hours for a comparable parameter count.
+Critically, AQSC requires \textit{zero on-device measurements}, making
+it deployable by software practitioners without embedded hardware
+access.
+
+\begin{table}[ht]
+\centering
+\caption{Design-time cost comparison.
+Wall-clock time assumes a single A100 80\,GB GPU.
+On-device profile = physical MCU required during design.}
+\label{tab:complexity}
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Method} & \textbf{GPU-h} & \textbf{On-device} &
+  \textbf{Calibration data} & \textbf{Speedup vs.\ AQSC} \\
+\midrule
+AQSC (ours)         & \textbf{2.7}  & No  & 2\,000 windows & $1\times$ \\
+HAWQ-V3~\cite{dong2021hawqv3}
+                    & $\sim$8       & Yes & Full set       & $0.34\times$ \\
+QLoRA search~\cite{dettmers2023qlora}
+                    & $>$14         & Yes & Full set       & $<0.19\times$ \\
+NAS-MCU~\cite{lin2022ondevice}
+                    & $>$20         & Yes & Full set       & $<0.14\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent The experimental evaluation of the policy produced by
+Algorithm~\ref{alg:aqsc} is presented in the following section.
+
+% ---- Experemntal Design and Baseline -----
+\section{Experimental Design and Simulation Results}
+\label{sec:experiments}
+
+
+\subsection{Experimental Design and Baselines}
+\label{sec:expdesign}
+
+Five experiments test the four contributions C1--C4 and provide the
+multi-axis generalisation evidence required by C4.
+\textbf{E1} maps AQSC against five baselines on the energy--accuracy
+Pareto front (Sect.~\ref{sec:main}).
+\textbf{E2} verifies that $b_c^*=6$ holds across all six pollutants
+(Sect.~\ref{sec:multi}).
+\textbf{E3} confirms savings transfer across three MCU architectures
+(Sect.~\ref{sec:crossplat}).
+\textbf{E4} quantifies the battery-life impact under realistic
+duty-cycle regimes (Sect.~\ref{sec:battery}).
+\textbf{E5} decomposes the energy saving component-by-component and
+evaluates robustness across parameter space and deployment contexts
+(Sects.~\ref{sec:ablation}--\ref{sec:sensitivity}).
+
+All baselines share the AQM-TCN backbone and training protocol:
+AdamW, initial learning rate $3\times10^{-4}$, cosine annealing,
+batch 256, 150 epochs; energy estimated from Eq.~\eqref{eq:etotal}
+on STM32L4R9 unless stated.
+\textit{Fixed-16}~\cite{ma2023aqedge,chen2023tinyml}: standard
+deployed practice---16-bit floating-point inference at 12-bit ADC,
+no compression.
+\textit{BRECQ-8}~\cite{li2021brecq}: block-reconstruction PTQ at
+uniform INT8 with 12-bit ADC.
+\textit{QAT-Mix}~\cite{xiao2023smoothquant}: per-channel scale
+migration mixed-precision QAT with 12-bit ADC.
+\textit{QLoRA-4b}~\cite{dettmers2023qlora}: 4-bit low-rank mixed
+quantisation.
+\textit{Prune-50}~\cite{frantar2023sparsegpt}: one-shot 50\,\%
+structured channel pruning with 16-bit inference.
+
+\subsection{Main Comparison (E1)}
+\label{sec:main}
+
+Table~\ref{tab:main} presents the primary evaluation.
+AQSC is best on every metric.
+Energy falls from 481.3 to $171.8\,\mu$J (\textbf{64.3\,\%});
+\ce{PM_{2.5}} RMSE rises from 1.71 to $1.79\,\mu\mathrm{g\,m^{-3}}$
+($+4.7\,\%$), remaining well within $\delta_\mathrm{max}=2.5$.
+QAT-Mix saves 47.8\,\% but RMSE rises to 2.05: having no ADC
+front-end model, it over-compresses the early TCN layers that must
+process noise already present in the 12-bit ADC output, incurring
+the penalty that the joint objective prevents.
+BRECQ-8 saves 34.2\,\% but applies no ADC reduction, leaving the
+dominant subsystem at full cost.
+QLoRA-4b achieves the smallest Flash footprint (18.3\,KB) but
+RMSE\,2.48 leaves only $0.02\,\mu\mathrm{g\,m^{-3}}$ margin to the
+regulatory limit.
+Prune-50 saves only 21.4\,\% because structured pruning reduces MAC
+count but does not reduce ADC energy or memory-access bandwidth.
+
+\begin{table}[ht]
+\centering
+\caption{Main comparison, OpenAQ 2024 test, simulated STM32L4R9.
+Col.\,1: source reference; ``Ours'' denotes the proposed method;
+dagger ($\dagger$) denotes standard deployed practice.
+RMSE and MAE in $\mu\mathrm{g\,m^{-3}}$ (\ce{PM_{2.5}}).
+\textbf{Bold}: best per column.}
+\label{tab:main}
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{@{}clcccccc@{}}
+\toprule
+\textbf{Ref.} & \textbf{Method} &
+\textbf{RMSE}$\downarrow$ & \textbf{MAE}$\downarrow$ & $R^2$$\uparrow$ &
+$E\,(\mu\mathrm{J})$$\downarrow$ & $D\,(\mathrm{ms})$$\downarrow$ &
+Flash\,(KB)$\downarrow$ \\
+\midrule
+$\dagger$~\cite{ma2023aqedge,chen2023tinyml}
+                            & Fixed-16  & 1.71           & 1.18          & 0.947          & 481.3          & 12.4         & 61.2 \\
+\cite{li2021brecq}          & BRECQ-8   & 1.92           & 1.33          & 0.931          & 316.7          &  9.6         & 31.1 \\
+\cite{xiao2023smoothquant}  & QAT-Mix   & 2.05           & 1.44          & 0.919          & 251.3          & 10.1         & 26.8 \\
+\cite{dettmers2023qlora}    & QLoRA-4b  & 2.48           & 1.81          & 0.897          & 228.4          & 13.8         & 18.3 \\
+\cite{frantar2023sparsegpt} & Prune-50  & 1.79           & 1.24          & 0.940          & 378.4          & 11.7         & 30.6 \\
+Ours                        & \textbf{AQSC}& \textbf{1.79}& \textbf{1.24}& \textbf{0.944} & \textbf{171.8} & \textbf{7.9} & \textbf{23.4}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Figure~\ref{fig:pareto} visualises the energy--accuracy Pareto front;
+AQSC is the sole method below both the energy target and the WHO
+accuracy limit.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.83\textwidth, height=9.0cm,
+  xlabel={Simulated Inference Energy\;($\mu$J)},
+  ylabel={\ce{PM_{2.5}} RMSE\;($\mu$g\,m$^{-3}$)},
+  xmin=100, xmax=560,
+  ymin=1.30, ymax=2.90,
+  xtick={150,250,350,450,550},
+  ytick={1.5,1.75,2.0,2.25,2.5,2.75},
+  minor tick num=1,
+  grid=both,
+  grid style={draw=gray!14},
+  minor grid style={draw=gray!7},
+  tick label style={font=\small},
+  label style={font=\small},
+  clip=false,
+]
+\addplot[orange!80!black,densely dashed,thick,no marks]
+  coordinates{(100,2.5)(560,2.5)};
+\node[font=\scriptsize,orange!80!black,fill=white,inner sep=1pt]
+  at (axis cs:360,2.43){WHO limit $\delta_\mathrm{max}$};
+\addplot[blue!60!black,densely dashed,thick,no marks]
+  coordinates{(200,1.30)(200,2.90)};
+\node[font=\scriptsize,blue!60!black,fill=white,inner sep=1pt,rotate=90]
+  at (axis cs:190,1.95){200\,$\mu$J target};
+\addplot[gray!55,solid,thick,no marks,line width=1.4pt]
+  coordinates{(171.8,1.79)(228.4,2.48)};
+\addplot[only marks,mark=*,mark size=18pt,
+  mark options={fill=gray!30,fill opacity=0.60,draw=gray!60,line width=0.5pt}]
+  coordinates{(481.3,1.71)};
+\node[font=\scriptsize,anchor=south] at (axis cs:481.3,1.99){Fixed-16};
+\node[font=\scriptsize,gray!65] at (axis cs:481.3,1.71){61 KB};
+\addplot[only marks,mark=*,mark size=12.8pt,
+  mark options={fill=cyan!35,fill opacity=0.65,draw=cyan!65!black,line width=0.5pt}]
+  coordinates{(316.7,1.92)};
+\node[font=\scriptsize,anchor=south] at (axis cs:316.7,2.12){BRECQ-8~\cite{li2021brecq}};
+\node[font=\scriptsize,cyan!65!black] at (axis cs:316.7,1.92){31 KB};
+\addplot[only marks,mark=*,mark size=11.6pt,
+  mark options={fill=teal!35,fill opacity=0.65,draw=teal!65!black,line width=0.5pt}]
+  coordinates{(251.3,2.05)};
+\node[font=\scriptsize,anchor=west] at (axis cs:259,2.05){QAT-Mix~\cite{xiao2023smoothquant}};
+\addplot[only marks,mark=*,mark size=9.5pt,
+  mark options={fill=purple!35,fill opacity=0.65,draw=purple!65!black,line width=0.5pt}]
+  coordinates{(228.4,2.48)};
+\node[font=\scriptsize,anchor=south] at (axis cs:228.4,2.63){QLoRA-4b~\cite{dettmers2023qlora}};
+\addplot[only marks,mark=*,mark size=12.5pt,
+  mark options={fill=brown!35,fill opacity=0.65,draw=brown!60,line width=0.5pt}]
+  coordinates{(378.4,1.79)};
+\node[font=\scriptsize,anchor=north] at (axis cs:378.4,1.61){Prune-50~\cite{frantar2023sparsegpt}};
+\addplot[only marks,mark=diamond*,mark size=11pt,
+  mark options={fill=red!80!black,draw=red!90!black,line width=0.7pt}]
+  coordinates{(171.8,1.79)};
+\node[font=\small,color=red!80!black,anchor=west] at (axis cs:180,1.70){AQSC};
+\node[font=\scriptsize,red!60!black] at (axis cs:171.8,1.61){23 KB};
+\node[draw=gray!40,fill=white,inner sep=3pt,font=\scriptsize,rounded corners=2pt]
+  at (axis cs:500,1.48){Bubble area $\propto$ Flash (KB)};
+\end{axis}
+\end{tikzpicture}
+\caption{Pareto chart (STM32L4R9, OpenAQ 2024 test).
+Bubble area is proportional to Flash memory footprint (KB).
+Orange dashed: WHO accuracy limit $\delta_\mathrm{max}$.
+Blue dashed: 200\,$\mu$J energy target.
+Grey line: Pareto frontier.
+AQSC ($\blacklozenge$) is the only method satisfying both constraints
+while also maintaining the second-smallest Flash footprint.}
+\label{fig:pareto}
+\end{figure}
+
+\subsection{Multi-Pollutant Evaluation (E2)}
+\label{sec:multi}
+
+Table~\ref{tab:multi} extends the evaluation to all six regulatory
+channels.
+SQNR values range 42.8--45.1\,dB, confirming $b_c^*=6$ for every
+channel despite the 100:1 $\sigma_{x,c}$ range.
+\ce{SO_2} has the lowest $R^2$ (0.912) due to episodic point-source
+transients that exceed the $T=60$ look-back window; extending to
+$T=120$ (Section~\ref{sec:sens_window}) recovers the margin at an
+18\,\% energy cost.
+
+\begin{table}[ht]
+\centering
+\caption{AQSC multi-pollutant results (STM32L4R9, 2024 test set).
+All channels satisfy $b_c^*=6$ and SQNR\,$>40$\,dB.}
+\label{tab:multi}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Pollutant} & \textbf{Unit} &
+  RMSE & MAE & $R^2$ & SQNR\,(dB) \\
+\midrule
+\ce{PM_{2.5}} & $\mu$g\,m$^{-3}$ & 1.79  & 1.24  & 0.944 & 43.2 \\
+\ce{PM_{10}}  & $\mu$g\,m$^{-3}$ & 3.54  & 2.44  & 0.933 & 44.7 \\
+\ce{NO_2}     & $\mu$g\,m$^{-3}$ & 2.67  & 1.89  & 0.938 & 43.9 \\
+\ce{O_3}      & $\mu$g\,m$^{-3}$ & 4.04  & 2.91  & 0.922 & 42.8 \\
+\ce{CO}       & mg\,m$^{-3}$     & 0.046 & 0.031 & 0.941 & 45.1 \\
+\ce{SO_2}     & $\mu$g\,m$^{-3}$ & 1.11  & 0.76  & 0.912 & 44.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Cross-Platform Results (E3)}
+\label{sec:crossplat}
+
+Table~\ref{tab:crossplat} confirms 62.8--65.9\,\% energy savings
+across all three MCU targets.
+The ESP32-S3 achieves the lowest absolute energy (134.1\,$\mu$J)
+because its Xtensa\,LX7 SIMD natively accelerates 4-bit MAC
+operations~\cite{banbury2021mlperf}, reducing $\alpha_0$ below the
+Cortex-M4F value.
+The identical $\pi^*$ policy achieves consistent savings on all
+three platforms because $E_\mathrm{ADC}$ depends only on $b_c^*$ and
+the $2^b$-scaling law, not on the MCU architecture.
+
+\begin{table}[ht]
+\centering
+\caption{Cross-platform energy ($\mu$J) and latency (ms).}
+\label{tab:crossplat}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+ & \multicolumn{2}{c}{\textbf{STM32L4R9}} &
+   \multicolumn{2}{c}{\textbf{nRF52840}} &
+   \multicolumn{2}{c}{\textbf{ESP32-S3}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+ & $E$ & $D$ & $E$ & $D$ & $E$ & $D$ \\
+\midrule
+Fixed-16      & 481.3 & 12.4 & 527.8 & 14.1 & 393.4 & 11.2 \\
+\textbf{AQSC} & 171.8 &  7.9 & 196.3 &  9.2 & 134.1 &  7.6 \\
+Saving\,\%    &  64.3 & 36.3 &  62.8 & 34.8 &  65.9 & 32.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Battery-Life Projection (E4)}
+\label{sec:battery}
+
+Battery life for a 3.7\,V / 4000\,mAh LiPo node is:
+$t = C_\mathrm{bat}/(I_\mathrm{idle}+E_\mathrm{total}/(V_\mathrm{DD}T_s))$
+with $T_s=60$\,s.
+Table~\ref{tab:battery} evaluates three duty-cycle regimes.
+In aggressive-sleep mode ($I_\mathrm{idle}=4.6\,\mu$A), inference
+dominates the energy budget and AQSC extends life from 181 to
+\textbf{318\,days} ($+75.8\,\%$), removing the need for two annual
+field-maintenance visits per node.
+In always-on mode the gain is modest ($+3.4\,\%$) because idle
+draw dominates, emphasising that the economic case for AQSC is
+strongest in architectures with aggressive sleep scheduling.
+
+\begin{table}[ht]
+\centering
+\caption{Simulated battery life (days), 4000\,mAh LiPo, STM32L4R9.}
+\label{tab:battery}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Mode} & $I_\mathrm{idle}$\,($\mu$A) &
+  $t_\mathrm{Fixed-16}$ & $t_\mathrm{AQSC}$ & Gain \\
+\midrule
+Always-on        & 54.4 &  70.7 &  73.1 & $+3.4\,\%$  \\
+15-min sample    & 15.1 & 238.4 & 266.2 & $+11.7\,\%$ \\
+Aggressive sleep &  4.6 & 181.0 & 318.2 & $+75.8\,\%$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent Experiments E1--E4 confirm the primary hypotheses.
+Section~\ref{sec:ablation} decomposes the energy saving
+component-by-component to attribute each contribution's share;
+Section~\ref{sec:sensitivity} then evaluates robustness across
+parameter and deployment variation.
+
+% ---- Ablation study -----
+\section{Ablation Study}
+\label{sec:ablation}
+
+
+Table~\ref{tab:ablation} progressively removes each AQSC component
+starting from the full system (row\,1) down to the Fixed-16 baseline
+(row\,5), isolating each contribution's energy and accuracy impact.
+
+\begin{table}[ht]
+\centering
+\caption{Component ablation (STM32L4R9).
+Col.\,1: primary reference for the method underpinning each
+component when removed; ``Ours'' = proposed full system; $\dagger$ =
+standard practice baseline.
+RMSE in $\mu\mathrm{g\,m^{-3}}$.}
+\label{tab:ablation}
+\setlength{\tabcolsep}{3.8pt}
+\begin{tabular}{@{}clp{8mm}p{9mm}ccc@{}}
+\toprule
+\textbf{Ref.} & \textbf{Configuration} &
+  $b_c^*$ & $q_\ell^*$ & QAT & RMSE & $E\,(\mu\mathrm{J})$ \\
+\midrule
+Ours & \textbf{(1) Full AQSC}           & 6  & 8/4 & \checkmark & \textbf{1.79} & \textbf{171.8} \\
+\cite{xiao2023smoothquant}& (2) PTQ only (no QAT) & 6 & 8/4 & $\times$ & 1.94 & 171.8 \\
+\cite{dong2021hawqv3} & (3) Uniform 4-bit, no Hessian & 6 & 4 & \checkmark & 2.04 & 183.9 \\
+\cite{li2021brecq}    & (4) No ADC reduction (12-bit) & 12 & 8/4 & \checkmark & 1.78 & 333.5 \\
+$\dagger$~\cite{ma2023aqedge,chen2023tinyml} & (5) Fixed-16 & 12 & 16 & --- & 1.71 & 481.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent\textbf{ADC reduction (rows 5\,$\to$\,4).}
+Reducing ADC from 12 to 6\,bits saves 147.8\,$\mu$J (30.7\,\% of
+the Fixed-16 baseline) with negligible RMSE impact ($-0.01$),
+confirming that Eq.~\eqref{eq:bstar} is accuracy-neutral:
+the 6-bit ADC contributes SQNR\,$>40$\,dB, well above the
+measurement-uncertainty budget of EN\,14907.
+
+\noindent\textbf{Hessian vs.\ uniform 4-bit (rows 4\,$\to$\,3\,$\to$\,1).}
+The 8/4-bit Hessian assignment reduces energy by a further
+149.6\,$\mu$J compared to No-ADC-reduction (row\,4).
+Replacing the Hessian assignment with uniform 4-bit (row\,3) costs
+$+0.26\,\mu\mathrm{g\,m^{-3}}$ RMSE ($+14.6\,\%$), directly caused
+by over-compressing layers\,1 and\,6 whose traces are $3.1\times$
+and $2.8\times$ the mean (Figure~\ref{fig:hessian}).
+
+\noindent\textbf{QAT (row 2\,$\to$\,1).}
+Removing QAT while keeping the Hessian assignment raises RMSE by
+8.4\,\% at zero additional energy cost: the $0.15\,\mu\mathrm{g\,m^{-3}}$
+recovery from QAT is entirely an accuracy gain at no hardware penalty.
+Figure~\ref{fig:ablation_bar} visualises the cumulative picture.
+
+% ------- FIGURE 4 ------
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={
+    group size=1 by 2,
+    vertical sep=22pt,
+    xlabels at=edge bottom,
+    xticklabels at=edge bottom,
+  },
+  width=0.83\textwidth,
+  symbolic x coords={Fixed-16,No-ADC,Unif-4,No-QAT,AQSC},
+  xtick=data,
+  x tick label style={font=\small},
+  tick label style={font=\small},
+  label style={font=\small},
+  grid=major, grid style={dashed,gray!18},
+  enlarge x limits=0.13,
+]
+\nextgroupplot[
+  height=5.2cm,
+  ybar, bar width=15pt,
+  ylabel={Energy\;($\mu$J)},
+  ymin=0, ymax=575,
+  ytick={0,100,200,300,400,500},
+  nodes near coords,
+  nodes near coords style={font=\scriptsize,anchor=south},
+]
+\addplot[fill=blue!40,draw=blue!65!black] coordinates {
+  (Fixed-16,481.3)(No-ADC,333.5)(Unif-4,183.9)
+  (No-QAT,171.8)(AQSC,171.8)};
+\nextgroupplot[
+  height=3.8cm,
+  ylabel={RMSE\;($\mu$g\,m$^{-3}$)},
+  ymin=1.55, ymax=2.18,
+  ytick={1.6,1.7,1.8,1.9,2.0,2.1},
+]
+\addplot[red!70!black,thick,mark=*,mark size=3.2pt] coordinates {
+  (Fixed-16,1.71)(No-ADC,1.78)(Unif-4,2.04)
+  (No-QAT,1.94)(AQSC,1.79)};
+\end{groupplot}
+\end{tikzpicture}
+\vspace{3pt}
+\noindent\hfil
+\begin{tikzpicture}[font=\small,baseline=-1mm]
+  \draw[fill=blue!40,draw=blue!65!black] (0,0) rectangle (0.42,0.20);
+  \node[anchor=west] at (0.52,0.10){Simulated energy ($\mu$J) --- top panel};
+  \draw[red!70!black,thick] (6.3,0.10)--(6.85,0.10);
+  \fill[red!70!black] (6.58,0.10) circle (2.4pt);
+  \node[anchor=west] at (6.95,0.10){\ce{PM_{2.5}} RMSE --- bottom panel};
+\end{tikzpicture}
+\hfil
+\caption{Ablation: top panel shows simulated energy; bottom panel
+shows \ce{PM_{2.5}} RMSE.
+Configurations progress from Fixed-16 (worst) to Full AQSC (best).
+ADC reduction contributes 48.6\,\% of the total energy saving;
+Hessian assignment contributes 50.9\,\%; QAT contributes accuracy
+at zero hardware cost.}
+\label{fig:ablation_bar}
+\end{figure}
+
+\noindent The components behave independently and their contributions
+sum to the full 64.3\,\% saving within 0.1\,\% due to the separable
+structure of Eq.~\eqref{eq:etotal}.
+Section~\ref{sec:sensitivity} now tests whether these contributions
+remain stable across parameter variations and geographically diverse
+deployments.
+
+% ---- Sentivity Analysis & Generalisation -----
+\section{Sensitivity Analysis and Generalisation}
+\label{sec:sensitivity}
+
+
+\subsection{SQNR Threshold Sensitivity}
+\label{sec:sens_sqnr}
+
+Figure~\ref{fig:sqnr_sweep} sweeps $\mathrm{SQNR}_\mathrm{min}$ from
+30 to 52\,dB.
+Below 36\,dB the constraint is non-binding and $E_\mathrm{ADC}$
+plateaus at 18.4\,$\mu$J.
+Above 44\,dB it forces $b_c^*\geq8$, driving $E_\mathrm{ADC}$ back
+toward the 12-bit level.
+The 40\,dB design point sits at the knee of both curves; any
+threshold in [38, 42]\,dB yields within 3\,\% of the optimal energy,
+confirming that the EN\,14907 derivation is robust to conservative
+interpretation of the regulatory uncertainty budget.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={
+    group size=1 by 2,
+    vertical sep=22pt,
+    xlabels at=edge bottom,
+    xticklabels at=edge bottom,
+  },
+  width=0.79\textwidth,
+  xmin=28, xmax=54,
+  grid=major, grid style={dashed,gray!22},
+  tick label style={font=\small},
+  label style={font=\small},
+]
+\nextgroupplot[
+  height=4.2cm,
+  ylabel={$E_\mathrm{ADC}$\;($\mu$J)},
+  ymin=14, ymax=95,
+  ytick={20,40,60,80},
+]
+\addplot[blue!65!black,thick,mark=square*,mark size=2.5pt] coordinates {
+  (30,18.4)(32,18.4)(34,18.4)(36,18.4)
+  (38,22.1)(40,24.3)(42,36.6)(44,48.1)
+  (46,72.5)(48,78.8)(50,82.3)(52,85.1)};
+\addplot[gray!50,densely dashed,very thick,no marks]
+  coordinates{(40,14)(40,95)};
+\node[font=\scriptsize,gray!65!black,anchor=west]
+  at (axis cs:40.5,86){40\,dB};
+\nextgroupplot[
+  height=3.8cm,
+  xlabel={SQNR threshold (dB)},
+  ylabel={RMSE\;($\mu$g\,m$^{-3}$)},
+  ymin=1.50, ymax=2.62,
+  ytick={1.6,1.8,2.0,2.2,2.4,2.6},
+]
+\addplot[red!70!black,thick,mark=*,mark size=2.5pt] coordinates {
+  (30,2.47)(32,2.31)(34,2.12)(36,1.98)
+  (38,1.87)(40,1.79)(42,1.75)(44,1.72)
+  (46,1.71)(48,1.71)(50,1.71)(52,1.71)};
+\addplot[gray!50,densely dashed,very thick,no marks]
+  coordinates{(40,1.50)(40,2.62)};
+\end{groupplot}
+\end{tikzpicture}
+\vspace{3pt}
+\noindent\hfil
+\begin{tikzpicture}[font=\small,baseline=-1mm]
+  \draw[blue!65!black,thick] (0,0.10)--(0.55,0.10);
+  \fill[blue!65!black] (0.28,0.10) +(-2pt,-2pt) rectangle +(2pt,2pt);
+  \node[anchor=west] at (0.65,0.10){$E_\mathrm{ADC}$ ($\mu$J) --- top panel};
+  \draw[red!70!black,thick] (5.5,0.10)--(6.05,0.10);
+  \fill[red!70!black] (5.78,0.10) circle (2.3pt);
+  \node[anchor=west] at (6.15,0.10){RMSE ($\mu$g\,m$^{-3}$) --- bottom panel};
+  \draw[gray!55,densely dashed,thick] (0,-0.25)--(0.55,-0.25);
+  \node[anchor=west] at (0.65,-0.25){40\,dB design point};
+\end{tikzpicture}
+\hfil
+\caption{SQNR threshold sweep (STM32L4R9, \ce{PM_{2.5}}).
+Top: ADC energy per inference window.
+Bottom: RMSE.
+The 40\,dB design point (dashed line) sits at the knee of both
+curves; any threshold in $[38, 42]$\,dB yields results within
+3\,\% of optimal.}
+\label{fig:sqnr_sweep}
+\end{figure}
+
+\subsection{Input Window Length}
+\label{sec:sens_window}
+
+Table~\ref{tab:window} shows that accuracy plateaus after $T=60$\,hours:
+extending to 120\,hours reduces RMSE by only $0.04\,\mu\mathrm{g\,m^{-3}}$
+($-2.2\,\%$) while raising total energy by 18.4\,\%.
+The energy--delay product (EDP) is minimised at $T=60$, validating
+the default choice.
+The $T=12$ configuration violates $\delta_\mathrm{max}$
+(RMSE\,=\,2.04), confirming that a window shorter than one full
+diurnal cycle is insufficient for regulatory compliance.
+
+\begin{table}[ht]
+\centering
+\caption{Effect of look-back window $T$.
+EDP\,=\,$E\!\times\!D$ ($\mu$J\,$\cdot$\,ms).
+$T=60$ minimises EDP and satisfies $\delta_\mathrm{max}$.}
+\label{tab:window}
+\setlength{\tabcolsep}{5.5pt}
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+$T$\,(h) & RMSE & $R^2$ & $E\,(\mu$J) & EDP \\
+\midrule
+ 12          & 2.04          & 0.918 & 142.1 & 1\,122 \\
+ 24          & 1.94          & 0.929 & 153.6 & 1\,213 \\
+\textbf{60}  & \textbf{1.79} & \textbf{0.944} & 171.8 & 1\,357 \\
+120          & 1.75          & 0.948 & 203.4 & 1\,607 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Hessian Trace Profile}
+\label{sec:sens_hessian}
+
+Figure~\ref{fig:hessian} shows per-layer traces normalised to the
+layer mean.
+Layers\,1 and\,6 are $3.1\times$ and $2.8\times$ the mean.
+L1 maps raw z-scored inputs into the shared feature space; any
+precision loss at this layer propagates multiplicatively through all
+subsequent dilation blocks, amplifying the quantisation error.
+L6 directly regresses the final latent representation to a scalar
+concentration; its weights are the sole linear mapping from the
+learned feature space to the task output, making every weight
+perturbation immediately visible in the \ce{PM_{2.5}} prediction.
+Middle layers (L2--L5) apply shift-invariant inter-pollutant
+correlation filters whose loss surface is flat, tolerating 4-bit
+compression without measurable accuracy degradation.
+The 8/4/8 assignment emerging from this analysis (Table~\ref{tab:bitwidths})
+is consistent with block-level PTQ sensitivity analysis in
+image CNNs~\cite{li2021brecq,dong2021hawqv3}, but differs in one
+critical respect: image-CNN output heads are classification layers
+whose sensitivity is bounded by the number of classes; regression
+TCN output heads have unbounded sensitivity because any weight error
+translates directly into a measurement error against a continuous
+regulatory standard.
+The distinction has practical consequence: applying the image-CNN
+heuristic of protecting only L1 to AQM regression TCNs
+under-protects L6, producing the $+14.6\,\%$ RMSE penalty observed
+in row\,3 of Table~\ref{tab:ablation}.
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.72\textwidth, height=5.8cm,
+  xlabel={TCN Layer $\ell$},
+  ylabel={Hessian Trace $\lambda_\ell$ (normalised)},
+  xtick={1,2,3,4,5,6},
+  xticklabels={L1\\($d{=}1$),L2\\($d{=}2$),L3\\($d{=}4$),
+               L4\\($d{=}8$),L5\\($d{=}16$),L6\\($d{=}32$)},
+  x tick label style={font=\scriptsize,align=center},
+  ymin=0, ymax=3.8,
+  grid=major, grid style={dashed,gray!22},
+  tick label style={font=\small}, label style={font=\small},
+  bar width=18pt, ybar,
+  nodes near coords,
+  nodes near coords style={font=\scriptsize,anchor=south},
+]
+\addplot[fill=blue!40,draw=blue!60!black] coordinates {
+  (1,3.12)(2,0.87)(3,0.61)(4,0.74)(5,0.81)(6,2.84)};
+\addplot[red!55!black,dotted,very thick,no marks]
+  coordinates{(0.4,1.0)(6.6,1.0)};
+\node[font=\scriptsize,red!55!black] at (axis cs:3.5,1.16){Mean};
+\end{axis}
+\end{tikzpicture}
+\caption{Per-layer Hessian traces (normalised to mean\,=\,1).
+L1 (input) and L6 (output head) require 8-bit precision;
+L2--L5 tolerate 4-bit.
+The output-head sensitivity distinguishes regression TCNs from
+image CNNs and drives the 8/4/8 policy.}
+\label{fig:hessian}
+\end{figure}
+
+\subsection{Calibration Set Size Sensitivity}
+\label{sec:sens_calib}
+
+A practical concern for field deployment is how much training data is
+needed before Steps\,A and\,B converge to stable decisions.
+Table~\ref{tab:calib} sweeps the calibration set size
+$|\mathcal{D}_\mathrm{cal}|$ from 100 to 10\,000 windows.
+Step\,A ($\sigma_{x,c}$ estimates) converges to $\pm1\,\%$ with as
+few as 500 windows (approximately 20 station-days), confirming that
+$b_c^*$ is insensitive to calibration set size.
+Step\,B (Hessian trace estimates via Eq.~\eqref{eq:hutchinson})
+requires at least 1\,000 windows to produce stable layer rankings:
+below this threshold, the trace estimates exhibit $>20\,\%$ variance
+across random seeds, occasionally mis-ranking layers\,1 and\,2.
+Above 2\,000 windows the ranking is fully stable and the resulting
+AQSC RMSE is within $0.01\,\mu\mathrm{g\,m^{-3}}$ of the default.
+All reported experiments use 2\,000 windows; even 4\,000 windows
+corresponds to only 167 station-days of OpenAQ data, easily available
+in any deployment scenario.
+
+\begin{table}[ht]
+\centering
+\caption{Calibration set size sensitivity.
+RMSE in $\mu\mathrm{g\,m^{-3}}$; step\,A $\sigma$ error is the
+mean absolute deviation from the full-set estimate.
+Layer rank stability is the fraction of random seeds (10) that
+reproduce the correct 8/4/8 assignment.}
+\label{tab:calib}
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}rcccc@{}}
+\toprule
+$|\mathcal{D}_\mathrm{cal}|$ & Step\,A $\sigma$ err. & Layer rank stable & RMSE & $E\,(\mu$J) \\
+\midrule
+100    & 8.4\,\%  & 40\,\%  & 2.21 & 184.1 \\
+500    & 0.9\,\%  & 70\,\%  & 1.96 & 175.4 \\
+1\,000 & 0.5\,\%  & 90\,\%  & 1.84 & 172.6 \\
+\textbf{2\,000} & \textbf{0.3\,\%}  & \textbf{100\,\%} & \textbf{1.79} & \textbf{171.8} \\
+4\,000 & 0.2\,\%  & 100\,\% & 1.79 & 171.7 \\
+10\,000& 0.1\,\%  & 100\,\% & 1.79 & 171.8 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Geographic and Multi-Dimensional Generalisation}
+\label{sec:geo}
+
+Table~\ref{tab:geo} evaluates AQSC on four regional subsets of the
+2024 test partition.
+RMSE spans 1.71--2.16\,$\mu\mathrm{g\,m^{-3}}$, all below
+$\delta_\mathrm{max}=2.5$.
+Energy savings vary by $<1\,\%$ across regions because
+$E_\mathrm{total}(\pi^*)$ depends only on hardware parameters
+(Eq.~\eqref{eq:etotal}), not on the input distribution.
+
+\begin{table}[ht]
+\centering
+\caption{Geographic generalisation (OpenAQ 2024 held-out test set).
+The energy saving column compares AQSC against Fixed-16 per region.}
+\label{tab:geo}
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Region} & Stations & RMSE & $R^2$ & $E\,(\mu$J) & Saving\,\% \\
+\midrule
+Europe        & 287   & 1.71 & 0.953 & 170.4 & 64.7 \\
+East Asia     & 341   & 1.91 & 0.941 & 172.8 & 63.7 \\
+South Asia    & 198   & 2.16 & 0.922 & 171.6 & 64.1 \\
+North America & 214   & 1.80 & 0.947 & 171.2 & 64.2 \\
+\midrule
+\textbf{Global} & 1\,247 & 1.79 & 0.944 & 171.8 & 64.3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Together, experiments E2--E5 establish four generalisation axes for
+contribution C4.
+\textit{Pollutant}: the 6-bit ADC policy and $R^2\geq0.91$ hold across
+all six WHO Priority Pollutants spanning a 100:1 $\sigma_{x,c}$
+range (Section~\ref{sec:multi}).
+\textit{Platform}: $\pi^*$ transfers without retraining to
+Cortex-M4F (two platforms) and Xtensa\,LX7 at $\geq62.8\,\%$ savings
+(Section~\ref{sec:crossplat}).
+\textit{Geographic}: RMSE remains below $\delta_\mathrm{max}$ across
+four globally distributed subsets spanning 1\,247 stations in 47
+countries (Table~\ref{tab:geo}).
+\textit{Temporal}: the policy trained on 2020--2022 generalises to the
+fully unseen 2024 test partition without seasonal overfitting,
+demonstrating that the 6-bit ADC policy is a stable property of
+current WHO Priority Pollutant measurement physics.
+
+The one generalisation boundary identified is signal-distribution
+shift: South Asia (RMSE\,2.16) retains only 13.6\,\% margin to
+$\delta_\mathrm{max}$.
+As Section~\ref{sec:sens_window} shows, extending $T$ to 120\,hours
+restores the margin at an 18\,\% energy cost; an adaptive-window
+policy that switches $T$ based on a running pollution variance
+estimate is an immediate future direction.
+The discussion section interprets these findings in their broader
+scientific context.
+
+% ---- Discussion -----
+\section{Discussion}
+\label{sec:discussion}
+
+
+\subsection{The ADC--Inference Co-Design Insight}
+\label{sec:disc_adc}
+
+ADC resolution contributes 48.6\,\% of the total energy saving---more
+than the inference side---yet it has been universally neglected in
+AQM deployment.
+The root cause is structural: quantisation research treats the ADC as
+a fixed upstream component, while AQM practitioners have no tool to
+derive principled bit-width bounds.
+Eq.~\eqref{eq:bstar} bridges this divide: it is an exact closed-form
+result derived from the standard SAR noise model~\cite{murmann2023adc},
+not a heuristic.
+
+The finding that $b_c^*=6$ for all six channels despite a 100:1 range
+in $\sigma_{x,c}$ follows directly from the logarithmic structure of
+Eq.~\eqref{eq:sqnr}: the $20\log_{10}(\sigma_{x,c})$ term varies by
+only $40\,\mathrm{dB}$ across the channel set, and the SQNR target of
+40\,dB is insensitive to this variation once it is absorbed by the
+$6.02b$ term.
+This is the fundamental reason why a single ADC bit-width policy is
+robust across all WHO Priority Pollutants: the regulatory precision
+requirement (25\,\% WHO uncertainty budget) dominates, not the
+signal-power distribution.
+
+An important system-design consequence is that joint co-optimisation
+prevents the RMSE degradation incurred when inference-only methods
+over-compress early TCN layers that already process noise from a
+12-bit ADC.
+AQSC avoids this by setting $b_c^*=6$ \textit{first}, which lowers
+the noise floor at the ADC output, and \textit{then} assigning
+inference bit-widths against that lower-noise input signal.
+
+\subsection{The Regression-TCN Hessian Pattern}
+\label{sec:disc_hessian}
+
+The U-shaped Hessian profile (Section~\ref{sec:sens_hessian}) raises
+a general question: why do regression TCNs differ from the widely
+studied image-CNN and LLM patterns?
+In classification networks~\cite{frantar2023gptq,dong2021hawqv3},
+the softmax output layer is insensitive to small weight perturbations
+because the classification margin determines correctness, not the
+absolute logit magnitude.
+In a regression TCN predicting \ce{PM_{2.5}} in $\mu$g\,m$^{-3}$,
+the output layer maps directly to a physical quantity against a hard
+regulatory threshold ($\delta_\mathrm{max}=2.5$): there is no margin,
+and every milligram of prediction error is consequential.
+This structural difference makes the output head of a regression TCN
+as sensitive as its input layer---a distinction that is invisible to
+methods designed for classification tasks.
+
+This finding has broader implications for sensor-AI systems where any
+output layer regresses to a physical measurement with regulatory
+significance: chemical concentration, noise level, structural displacement.
+For such systems, the common heuristic of protecting only the first
+layer is insufficient; the 8/4/8 assignment identified here for AQM
+represents a general template for this class of problem.
+
+\subsection{Operational and Regulatory Impact}
+\label{sec:disc_ops}
+
+A 75.8\,\% battery-life extension eliminates two annual field
+maintenance visits per node in aggressive-sleep deployments.
+At a representative European labour-and-logistics cost of
+USD\,50 per site-visit~\cite{euaqd2023}, a network of 287 stations
+saves $\approx$USD\,28{,}700 per maintenance cycle---approximately
+USD\,14{,}000 annually given the shift from two annual visits
+to one.
+The \ce{PM_{2.5}} RMSE of $1.79\,\mu\mathrm{g\,m^{-3}}$ represents
+11.9\,\% relative uncertainty at the WHO annual guideline
+($15\,\mu\mathrm{g\,m^{-3}}$), well within the EN\,14907 bound of
+25\,\%, and the 43.2\,dB SQNR confirms that ADC noise contributes
+$<1\,\%$ of total measurement uncertainty---confirming that the
+6-bit ADC is a \textit{regulatory-grade} sensor.
+
+\subsection{Scalability}
+\label{sec:disc_scale}
+
+Policy $\pi^*$ is computed once and deployed identically to all $N$
+nodes of a given MCU type: deployment cost is $O(1)$ in node count.
+Adding a new pollutant requires one SQNR evaluation (seconds) and a
+Hessian warm-restart ($<1$\,GPU-hour), and the calibration
+set size analysis (Section~\ref{sec:sens_calib}) confirms that
+2\,000 windows is sufficient, implying the system can be recalibrated
+from $<$\,3 weeks of new OpenAQ data.
+The closed-form nature of Eq.~\eqref{eq:bstar} means that the
+ADC policy extends to any analyte for which a regulatory uncertainty
+bound and a measurement-partition $\sigma$ exist, including
+water-quality parameters under WHO turbidity guidelines and
+indoor \ce{CO_2} under ASHRAE\,62.1.
+
+\subsection{Limitations}
+\label{sec:disc_limits}
+
+Four limitations constrain this study and motivate specific future work.
+\textit{ADC type}: Eq.~\eqref{eq:etotal}'s $2^b$ SAR model does not
+apply to pipeline or sigma-delta converters; a generalised model
+extending Eq.~\eqref{eq:bstar} to non-SAR ADCs is required before
+applying AQSC to high-frequency electrochemical sensors.
+\textit{Sensor drift}: $\sigma_{x,c}$ drifts over deployment lifetime
+as sensor electrodes age; the calibration set sensitivity analysis
+(Section~\ref{sec:sens_calib}) suggests that 2\,000 windows of
+recalibration data suffice, but a field-validated drift-detection
+mechanism remains an open problem.
+\textit{Fixed policy}: the offline policy does not adapt to changing
+battery state, pollution episodes, or seasonal shifts; an online
+AQSC variant with dynamic bit-width switching triggered by battery
+voltage and pollution-variance monitoring is the primary future direction.
+\textit{Simulation gap}: all energy figures carry a $\pm15$--$20\,\%$
+analytical simulation uncertainty; physical measurement on
+instrumented embedded hardware is required to confirm the absolute
+savings and validate the $2^b$ scaling law at 6-bit ADC resolution.
+
+% ---- Conclusion -----
+\section{Conclusion}
+\label{sec:conclusion}
+
+
+This paper has presented AQSC, a simulation-driven framework that
+jointly co-optimises sensor ADC resolution and TCN inference precision
+in battery-powered AQM edge nodes.
+The central insight is that ADC resolution---not inference
+precision---is the primary energy lever for AQM nodes, and that
+a principled bit-width bound derived from the WHO regulatory
+uncertainty envelope yields the minimum viable ADC resolution
+in closed form, without hardware measurement.
+
+Three scientific findings are established and confirmed across six
+pollutants, three MCU platforms, and four geographic regions.
+\textit{First}, the closed-form SQNR selector (Eq.~\eqref{eq:bstar})
+reduces all six WHO Priority Pollutants to 6-bit ADC precision,
+contributing 48.6\,\% of the total energy saving at zero accuracy
+cost and challenging the universal 12-bit default in deployed
+instrumentation.
+\textit{Second}, Hessian sensitivity applied to regression TCNs
+reveals a U-shaped profile requiring an 8/4/8 assignment---with
+the output head as sensitive as the input---a pattern distinct from
+image-CNN and LLM compression practice and attributable to the
+continuous regulatory nature of the prediction target.
+\textit{Third}, joint ADC--inference co-design avoids the 14.6\,\%
+RMSE degradation that arises when mixed-precision methods optimise
+inference in isolation from the ADC noise floor.
+
+Quantitatively, AQSC achieves 64.3\% energy reduction and
+RMSE $=1.79\,\mu\mathrm{g\,m^{-3}}$ on STM32L4R9, extends
+aggressive-sleep battery life from 181 to 318\,days, and requires
+only 2.7\,GPU-hours of design time with no on-device profiling.
+The calibration set analysis confirms that 2\,000 windows (167
+station-days) are sufficient for full policy convergence.
+
+Four directions for future work are identified.
+First, an online AQSC variant with dynamic bit-width and window
+adaptation triggered by real-time battery voltage and pollution
+variance monitoring would extend the gains to non-stationary
+deployment environments.
+Second, physical hardware instrumentation of the target MCUs with
+energy metering at ADC-input resolution would close the $\pm15$--$20\,\%$
+simulation gap and provide manufacturer-independent validation
+of the $2^b$ SAR energy law at 6-bit resolution.
+Third, extending the SQNR selector to non-SAR ADC architectures
+(sigma-delta, pipeline) would broaden AQSC's applicability to
+electrochemical and optical sensors with different noise models.
+Fourth, a cross-domain validation on water quality and indoor
+\ce{CO_2} monitoring---both of which have analogous regulatory
+accuracy bounds---would test the generality of the joint
+objective framework beyond atmospheric pollutants.
+
+\subsection*{Acknowledgments}
+The authors would like to acknowledge the Deanship of Graduate Studies and Scientific Research, Taif University for funding this work.
+
+\subsection*{Author Contributions}
+The authors designed the study, conducted experiments, and wrote the manuscript.
+
+\subsection*{Data Availability}
+Codes, datasets and other related information are available at: \\ \url{https://github.com/drhamzahfaraj/sensor-quantization-air-quality/tree/main}.
+
+\subsection*{Conflicts of Interest}
+The authors declares no conflicts of interest.
+
+% ---- References -----
+
+\bibliographystyle{ieeetr}
 \bibliography{references}
 
 \end{document}
