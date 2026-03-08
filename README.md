@@ -121,20 +121,6 @@ pdflatex main.tex && bibtex main && pdflatex main.tex && pdflatex main.tex
 
 Requires TeX Live 2022+ with packages: `algorithm2e`, `booktabs`, `siunitx`, `authblk`, `subcaption`, `tabularx`, `enumitem`, `titlesec`.
 
----
-
-## Citation
-
-If you use this work, please cite:
-
-```bibtex
-@article{farraj2026aqsc,
-  title={Adaptive Quantisation for Sensor Chains: Energy-Efficient Air Quality Monitoring on Resource-Constrained Edge Devices},
-  author={Farraj, Hamza},
-  journal={Under Review},
-  year={2026}
-}
-```
 
 ---
 
